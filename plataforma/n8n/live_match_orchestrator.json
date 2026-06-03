@@ -1,0 +1,477 @@
+{
+  "name": "FanFest AI - Live Match Orchestrator & Safety Validator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "live-match-trigger",
+        "options": {}
+      },
+      "id": "e0d00a8c-6e1d-4f36-96b6-5d465355fa11",
+      "name": "Webhook API-Football",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": "sports_events",
+        "options": {},
+        "filters": {
+          "conditions": [
+            {
+              "key": "external_event_id",
+              "operator": "equal",
+              "value": "={{ $json.body.fixture.id.toString() }}"
+            }
+          ]
+        }
+      },
+      "id": "f51276a7-fa7f-4c55-bfa2-936612ea2c12",
+      "name": "Get Live Event",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": "promotions",
+        "options": {},
+        "filters": {
+          "conditions": [
+            {
+              "key": "trigger_type",
+              "operator": "equal",
+              "value": "goal_home"
+            },
+            {
+              "key": "is_active",
+              "operator": "equal",
+              "value": true
+            }
+          ]
+        }
+      },
+      "id": "673f4e1f-e3c3-4d7a-b50a-412ea557df13",
+      "name": "Get Active Promotions",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// For each active promotion found, we'll fork and create a campaign context\nconst promotions = items;\nconst event = $('Get Live Event').first().json;\n\nreturn promotions.map(promo => {\n  return {\n    json: {\n      promotion_id: promo.json.id,\n      business_id: promo.json.business_id,\n      sports_event_id: event.id,\n      discount: promo.json.discount_text,\n      duration_minutes: promo.json.duration_minutes,\n      context: {\n        home_team: event.home_team,\n        away_team: event.away_team,\n        score: `${event.home_score}-${event.away_score}`,\n        minute: event.match_minute,\n        scorer: $('Webhook API-Football').first().json.body.event?.player?.name || 'Goleador'\n      }\n    }\n  };\n});"
+      },
+      "id": "41a12e2e-2f5a-4b9b-8395-812ea6621fb1",
+      "name": "Prepare Contexts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": "businesses",
+        "options": {},
+        "filters": {
+          "conditions": [
+            {
+              "key": "id",
+              "operator": "equal",
+              "value": "={{ $json.business_id }}"
+            }
+          ]
+        }
+      },
+      "id": "a901e12e-4b61-419b-a010-812ea77112ea",
+      "name": "Get Business Info",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": "prompt_templates",
+        "options": {},
+        "filters": {
+          "conditions": [
+            {
+              "key": "key",
+              "operator": "equal",
+              "value": "=copy_{{ $('Get Business Info').item.json.tone_default }}"
+            }
+          ]
+        }
+      },
+      "id": "c1f101ab-234e-4e67-88aa-812ea881a7db",
+      "name": "Get Tone Template",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fill in user prompt template with database variables\nconst template = $('Get Tone Template').first().json.user_template;\nconst biz = $('Get Business Info').first().json;\nconst prep = $('Prepare Contexts').first().json;\n\nlet prompt = template\n  .replace('{{business_name}}', biz.name)\n  .replace('{{neighborhood}}', biz.neighborhood)\n  .replace('{{team}}', prep.context.home_team)\n  .replace('{{scorer}}', prep.context.scorer)\n  .replace('{{score}}', prep.context.score)\n  .replace('{{minute}}', prep.context.minute)\n  .replace('{{discount}}', prep.discount)\n  .replace('{{duration_minutes}}', prep.duration_minutes);\n\nreturn {\n  json: {\n    system_prompt: $('Get Tone Template').first().json.system_prompt,\n    compiled_prompt: prompt\n  }\n};"
+      },
+      "id": "e22a559e-4b4d-44a5-9aa4-812ea99a6321",
+      "name": "Compile Prompt Template",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gemini-2.0-flash",
+        "prompt": "={{ $json.compiled_prompt }}",
+        "options": {
+          "systemInstruction": "={{ $json.system_prompt }}"
+        }
+      },
+      "id": "4b6c31a7-8e67-4a0b-8d02-812eaaac1db2",
+      "name": "Google Gemini Generation",
+      "type": "n8n-nodes-base.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": "prompt_templates",
+        "options": {},
+        "filters": {
+          "conditions": [
+            {
+              "key": "key",
+              "operator": "equal",
+              "value": "safety_validator"
+            }
+          ]
+        }
+      },
+      "id": "7fa12a8e-2f5a-4b9b-8395-812eabbb2fb1",
+      "name": "Get Safety Template",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare prompt for the AI Safety Validator\nconst template = $('Get Safety Template').first().json.user_template;\nconst copyText = $('Google Gemini Generation').first().json.text;\nconst prep = $('Prepare Contexts').first().json;\n\nconst compiledValidatorPrompt = template\n  .replace('{{copy_text}}', copyText)\n  .replace('{{discount}}', prep.discount)\n  .replace('{{duration_minutes}}', prep.duration_minutes);\n\nreturn {\n  json: {\n    system_prompt: $('Get Safety Template').first().json.system_prompt,\n    compiled_prompt: compiledValidatorPrompt\n  }\n};"
+      },
+      "id": "92da559e-4b4d-44a5-9aa4-812eaccca432",
+      "name": "Compile Safety Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gemini-2.0-flash",
+        "prompt": "={{ $json.compiled_prompt }}",
+        "options": {
+          "systemInstruction": "={{ $json.system_prompt }}",
+          "responseMimeType": "application/json"
+        }
+      },
+      "id": "1b6c31a7-8e67-4a0b-8d02-812eaddd1db2",
+      "name": "Gemini Safety Check",
+      "type": "n8n-nodes-base.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        2100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse the JSON response from safety check and determine campaign status\nconst safetyResponse = JSON.parse($('Gemini Safety Check').first().json.text);\nconst isSafe = safetyResponse.is_safe === true;\nconst biz = $('Get Business Info').first().json;\nconst prep = $('Prepare Contexts').first().json;\n\nreturn {\n  json: {\n    is_safe: isSafe,\n    safety_reason: safetyResponse.reason || 'OK',\n    campaign_status: isSafe ? 'pending_approval' : 'failed',\n    payload: {\n      business_id: biz.id,\n      sports_event_id: prep.sports_event_id,\n      promotion_id: prep.promotion_id,\n      campaign_type: 'auto',\n      trigger_event: 'goal_home',\n      status: isSafe ? 'pending_approval' : 'failed',\n      tone: biz.tone_default,\n      neighborhood_context: biz.neighborhood,\n      context_snapshot: {\n        home_score: prep.context.score.split('-')[0],\n        away_score: prep.context.score.split('-')[1],\n        minute: prep.context.minute,\n        scorer: prep.context.scorer\n      }\n    },\n    ai_generation: {\n      prompt_system: $('Get Tone Template').first().json.system_prompt,\n      prompt_user: $('Compile Prompt Template').first().json.compiled_prompt,\n      response_text: $('Google Gemini Generation').first().json.text,\n      model: 'gemini-2.0-flash',\n      is_selected: isSafe\n    }\n  }\n};"
+      },
+      "id": "e2ea559e-4b4d-44a5-9aa4-812eaeeea432",
+      "name": "Process Quality Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "campaigns",
+        "fieldsAndValues": {
+          "columns": [
+            {
+              "column": "business_id",
+              "value": "={{ $json.payload.business_id }}"
+            },
+            {
+              "column": "sports_event_id",
+              "value": "={{ $json.payload.sports_event_id }}"
+            },
+            {
+              "column": "promotion_id",
+              "value": "={{ $json.payload.promotion_id }}"
+            },
+            {
+              "column": "campaign_type",
+              "value": "={{ $json.payload.campaign_type }}"
+            },
+            {
+              "column": "trigger_event",
+              "value": "={{ $json.payload.trigger_event }}"
+            },
+            {
+              "column": "status",
+              "value": "={{ $json.payload.status }}"
+            },
+            {
+              "column": "tone",
+              "value": "={{ $json.payload.tone }}"
+            },
+            {
+              "column": "neighborhood_context",
+              "value": "={{ $json.payload.neighborhood_context }}"
+            },
+            {
+              "column": "context_snapshot",
+              "value": "={{ JSON.stringify($json.payload.context_snapshot) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "91a12e2e-2f5a-4b9b-8395-812eafff1fb1",
+      "name": "Insert Campaign in Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "ai_generations",
+        "fieldsAndValues": {
+          "columns": [
+            {
+              "column": "campaign_id",
+              "value": "={{ $('Insert Campaign in Supabase').first().json.id }}"
+            },
+            {
+              "column": "prompt_system",
+              "value": "={{ $('Process Quality Output').first().json.ai_generation.prompt_system }}"
+            },
+            {
+              "column": "prompt_user",
+              "value": "={{ $('Process Quality Output').first().json.ai_generation.prompt_user }}"
+            },
+            {
+              "column": "response_text",
+              "value": "={{ $('Process Quality Output').first().json.ai_generation.response_text }}"
+            },
+            {
+              "column": "model",
+              "value": "={{ $('Process Quality Output').first().json.ai_generation.model }}"
+            },
+            {
+              "column": "is_selected",
+              "value": "={{ $('Process Quality Output').first().json.ai_generation.is_selected }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a3b12e2e-2f5a-4b9b-8395-812ea0001fb1",
+      "name": "Insert AI Generation",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2700,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook API-Football": {
+      "main": [
+        [
+          {
+            "node": "Get Live Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Live Event": {
+      "main": [
+        [
+          {
+            "node": "Get Active Promotions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Promotions": {
+      "main": [
+        [
+          {
+            "node": "Prepare Contexts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Contexts": {
+      "main": [
+        [
+          {
+            "node": "Get Business Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Business Info": {
+      "main": [
+        [
+          {
+            "node": "Get Tone Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Tone Template": {
+      "main": [
+        [
+          {
+            "node": "Compile Prompt Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compile Prompt Template": {
+      "main": [
+        [
+          {
+            "node": "Google Gemini Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Generation": {
+      "main": [
+        [
+          {
+            "node": "Get Safety Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Safety Template": {
+      "main": [
+        [
+          {
+            "node": "Compile Safety Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compile Safety Prompt": {
+      "main": [
+        [
+          {
+            "node": "Gemini Safety Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Safety Check": {
+      "main": [
+        [
+          {
+            "node": "Process Quality Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Quality Output": {
+      "main": [
+        [
+          {
+            "node": "Insert Campaign in Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Campaign in Supabase": {
+      "main": [
+        [
+          {
+            "node": "Insert AI Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {}
+}

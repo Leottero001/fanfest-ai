@@ -1,0 +1,492 @@
+{
+  "name": "FanFest AI - Social Publisher",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "publish-campaign",
+        "options": {}
+      },
+      "id": "a1d00a8c-6e1d-4f36-96b6-5d465355fa22",
+      "name": "Webhook Publish Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": "campaigns",
+        "options": {},
+        "filters": {
+          "conditions": [
+            {
+              "key": "id",
+              "operator": "equal",
+              "value": "={{ $json.body.campaign_id }}"
+            }
+          ]
+        }
+      },
+      "id": "b51276a7-fa7f-4c55-bfa2-936612ea2c23",
+      "name": "Get Campaign",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": "ai_generations",
+        "options": {},
+        "filters": {
+          "conditions": [
+            {
+              "key": "campaign_id",
+              "operator": "equal",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "key": "is_selected",
+              "operator": "equal",
+              "value": true
+            }
+          ]
+        }
+      },
+      "id": "c73f4e1f-e3c3-4d7a-b50a-412ea557df24",
+      "name": "Get Selected Copy",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": "businesses",
+        "options": {},
+        "filters": {
+          "conditions": [
+            {
+              "key": "id",
+              "operator": "equal",
+              "value": "={{ $('Get Campaign').first().json.business_id }}"
+            }
+          ]
+        }
+      },
+      "id": "d901e12e-4b61-419b-a010-812ea77112eb",
+      "name": "Get Business Credentials",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare the publishing payload and dynamic poster configurations\nconst biz = $('Get Business Credentials').first().json;\nconst copy = $('Get Selected Copy').first().json.response_text;\n\n// In a production setup, we can use an HTML-to-Image API (like Bannerbear, Placid, or a custom service on Space)\n// Here, we generate a mock image URL or dynamic placeholder poster.\nconst dynamicPosterUrl = `https://images.unsplash.com/photo-1508098682722-e99c43a406b2?w=800&q=80`; \n\nreturn {\n  json: {\n    campaign_id: $('Get Campaign').first().json.id,\n    ai_generation_id: $('Get Selected Copy').first().json.id,\n    instagram_handle: biz.instagram_handle,\n    caption: copy,\n    media_url: dynamicPosterUrl\n  }\n};"
+      },
+      "id": "e22a559e-4b4d-44a5-9aa4-812ea99a6332",
+      "name": "Prepare Publishing Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $('Get Business Credentials').first().json.instagram_handle }}/media",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ process.env.INSTAGRAM_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "image_url",
+              "value": "={{ $json.media_url }}"
+            },
+            {
+              "name": "caption",
+              "value": "={{ $json.caption }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f1b6c31a-8e67-4a0b-8d02-812eaaac1dc3",
+      "name": "Instagram Create Container",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1100,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $('Get Business Credentials').first().json.instagram_handle }}/media_publish",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ process.env.INSTAGRAM_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "creation_id",
+              "value": "={{ $json.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "g1b6c31a-8e67-4a0b-8d02-812eaaac1dc4",
+      "name": "Instagram Publish Media",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1300,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $('Get Business Credentials').first().json.facebook_page_id }}/feed",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ process.env.FACEBOOK_PAGE_ACCESS_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "message",
+              "value": "={{ $('Prepare Publishing Data').first().json.caption }}"
+            },
+            {
+              "name": "link",
+              "value": "={{ $('Prepare Publishing Data').first().json.media_url }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "h1b6c31a-8e67-4a0b-8d02-812eaaac1dc5",
+      "name": "Facebook Page Post",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1100,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge publish details from Facebook & Instagram channels\nconst igPublish = $('Instagram Publish Media').first()?.json || { id: null };\nconst fbPublish = $('Facebook Page Post').first()?.json || { id: null };\nconst prep = $('Prepare Publishing Data').first().json;\n\nreturn {\n  json: {\n    campaign_id: prep.campaign_id,\n    ai_generation_id: prep.ai_generation_id,\n    status: 'published',\n    ig_post_id: igPublish.id,\n    fb_post_id: fbPublish.id,\n    media_url: prep.media_url,\n    caption: prep.caption\n  }\n};"
+      },
+      "id": "e2ea559e-4b4d-44a5-9aa4-812eaeeea443",
+      "name": "Process Publishing Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "table": "campaigns",
+        "fieldsAndValues": {
+          "columns": [
+            {
+              "column": "status",
+              "value": "published"
+            },
+            {
+              "column": "approved_at",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {},
+        "filters": {
+          "conditions": [
+            {
+              "key": "id",
+              "operator": "equal",
+              "value": "={{ $json.campaign_id }}"
+            }
+          ]
+        }
+      },
+      "id": "91a12e2e-2f5a-4b9b-8395-812eafff1fc2",
+      "name": "Update Campaign to Published",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        1800,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "publications",
+        "fieldsAndValues": {
+          "columns": [
+            {
+              "column": "campaign_id",
+              "value": "={{ $json.campaign_id }}"
+            },
+            {
+              "column": "ai_generation_id",
+              "value": "={{ $json.ai_generation_id }}"
+            },
+            {
+              "column": "platform",
+              "value": "instagram"
+            },
+            {
+              "column": "platform_post_id",
+              "value": "={{ $json.ig_post_id }}"
+            },
+            {
+              "column": "status",
+              "value": "published"
+            },
+            {
+              "column": "media_url",
+              "value": "={{ $json.media_url }}"
+            },
+            {
+              "column": "caption_text",
+              "value": "={{ $json.caption }}"
+            },
+            {
+              "column": "published_at",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a3b12e2e-2f5a-4b9b-8395-812ea0001fc2",
+      "name": "Insert Instagram Publication",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "publications",
+        "fieldsAndValues": {
+          "columns": [
+            {
+              "column": "campaign_id",
+              "value": "={{ $json.campaign_id }}"
+            },
+            {
+              "column": "ai_generation_id",
+              "value": "={{ $json.ai_generation_id }}"
+            },
+            {
+              "column": "platform",
+              "value": "facebook"
+            },
+            {
+              "column": "platform_post_id",
+              "value": "={{ $json.fb_post_id }}"
+            },
+            {
+              "column": "status",
+              "value": "published"
+            },
+            {
+              "column": "media_url",
+              "value": "={{ $json.media_url }}"
+            },
+            {
+              "column": "caption_text",
+              "value": "={{ $json.caption }}"
+            },
+            {
+              "column": "published_at",
+              "value": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a3b12e2e-2f5a-4b9b-8395-812ea0001fc3",
+      "name": "Insert Facebook Publication",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Publish Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Campaign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Campaign": {
+      "main": [
+        [
+          {
+            "node": "Get Selected Copy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Selected Copy": {
+      "main": [
+        [
+          {
+            "node": "Get Business Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Business Credentials": {
+      "main": [
+        [
+          {
+            "node": "Prepare Publishing Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Publishing Data": {
+      "main": [
+        [
+          {
+            "node": "Instagram Create Container",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Facebook Page Post",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instagram Create Container": {
+      "main": [
+        [
+          {
+            "node": "Instagram Publish Media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Instagram Publish Media": {
+      "main": [
+        [
+          {
+            "node": "Process Publishing Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Facebook Page Post": {
+      "main": [
+        [
+          {
+            "node": "Process Publishing Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Publishing Result": {
+      "main": [
+        [
+          {
+            "node": "Update Campaign to Published",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Campaign to Published": {
+      "main": [
+        [
+          {
+            "node": "Insert Instagram Publication",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Insert Facebook Publication",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {}
+}
