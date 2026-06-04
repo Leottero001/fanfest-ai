@@ -65,9 +65,9 @@ export default function LandingPage() {
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase
-        .from('beta_businesses')
-        .insert([formData]);
+      const { error } = await (supabase.from('beta_businesses') as any).insert([
+        formData,
+      ]);
 
       if (error) throw error;
       
