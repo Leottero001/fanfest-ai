@@ -1,0 +1,388 @@
+{
+  "name": "FanFest AI - Pre-Match Content Generator (WhatsApp MVP)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "cron-001-trigger",
+      "name": "Cron: Revisar Partidos cada 6h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [100, 300],
+      "notes": "Corre cada 6 horas. Verifica si hay partidos en las próximas 48h y dispara la generación de contenido si aún no fue enviado."
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": "sports_events",
+        "options": {},
+        "filters": {
+          "conditions": [
+            {
+              "key": "status",
+              "operator": "equal",
+              "value": "scheduled"
+            }
+          ]
+        }
+      },
+      "id": "sb-001-get-events",
+      "name": "Obtener Partidos Programados",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [300, 300],
+      "notes": "Trae todos los partidos con status='scheduled'. El filtro de ventana 48h se hace en el nodo siguiente."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filtrar partidos dentro de la ventana de 48 horas\nconst events = $input.all();\nconst now = new Date();\nconst windowHours = 48;\nconst windowMs = windowHours * 60 * 60 * 1000;\n\nconst upcomingEvents = events.filter(item => {\n  const startsAt = new Date(item.json.starts_at);\n  const diffMs = startsAt - now;\n  // Entre 0 y 48 horas desde ahora\n  return diffMs > 0 && diffMs <= windowMs;\n});\n\nif (upcomingEvents.length === 0) {\n  // No hay partidos próximos, detener el flujo\n  return [];\n}\n\nconsole.log(`Partidos encontrados en ventana 48h: ${upcomingEvents.length}`);\nreturn upcomingEvents.map(e => ({ json: e.json }));"
+      },
+      "id": "code-001-filter-window",
+      "name": "Filtrar Ventana 48 Horas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": "beta_businesses",
+        "options": {},
+        "filters": {
+          "conditions": [
+            {
+              "key": "status",
+              "operator": "equal",
+              "value": "contacted"
+            },
+            {
+              "key": "will_stream_world_cup",
+              "operator": "equal",
+              "value": true
+            }
+          ]
+        }
+      },
+      "id": "sb-002-get-businesses",
+      "name": "Obtener Negocios Activos",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "notes": "Solo negocios que están en status contacted/pilot_active y que transmiten el mundial"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Crear el producto cartesiano: cada negocio × cada partido próximo\n// Pero evitar duplicados: si ya existe un envío previo para este par (negocio+partido), saltar\nconst events = $('Filtrar Ventana 48 Horas').all().map(i => i.json);\nconst businesses = $input.all().map(i => i.json);\n\nconst pairs = [];\n\nfor (const event of events) {\n  for (const biz of businesses) {\n    pairs.push({\n      json: {\n        event_id: event.id,\n        event_home_team: event.home_team,\n        event_away_team: event.away_team,\n        event_league: event.league || 'Copa Mundial FIFA 2026',\n        event_starts_at: event.starts_at,\n        event_venue: event.venue || '',\n        event_home_logo: event.home_team_logo || '',\n        event_away_logo: event.away_team_logo || '',\n        event_metadata: event.event_metadata || {},\n        business_id: biz.id,\n        business_name: biz.business_name,\n        business_type: biz.business_type,\n        neighborhood: biz.neighborhood,\n        city: biz.city,\n        whatsapp: biz.whatsapp,\n        instagram: biz.instagram || '',\n        // Digital Identity Layer\n        target_audience: biz.target_audience || [],\n        communication_tone: biz.communication_tone || '',\n        specialties: biz.specialties || [],\n        usual_promos: biz.usual_promos || [],\n        preferred_hashtags: biz.preferred_hashtags || [],\n        preferred_language: biz.preferred_language || 'Español',\n        // Tono basado en tipo de negocio o valor explícito\n        tone: biz.communication_tone || (['Gastrobar', 'Discoteca'].includes(biz.business_type) ? 'premium' : 'paisa')\n      }\n    });\n  }\n}\n\nconsole.log(`Pares negocio×partido generados: ${pairs.length}`);\nreturn pairs;"
+      },
+      "id": "code-002-cross-join",
+      "name": "Cruzar Negocios × Partidos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": "whatsapp_messages_log",
+        "options": {},
+        "filters": {
+          "conditions": [
+            {
+              "key": "beta_business_id",
+              "operator": "equal",
+              "value": "={{ $json.business_id }}"
+            },
+            {
+              "key": "sports_event_id",
+              "operator": "equal",
+              "value": "={{ $json.event_id }}"
+            },
+            {
+              "key": "message_type",
+              "operator": "equal",
+              "value": "pre_match_content"
+            }
+          ]
+        }
+      },
+      "id": "sb-003-check-duplicate",
+      "name": "Verificar: ¿Ya se envió este contenido?",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1100, 300],
+      "notes": "Previene envíos duplicados para el mismo par negocio+partido"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "check-not-sent",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-001-not-duplicate",
+      "name": "¿Es nuevo (no enviado)?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1300, 300],
+      "notes": "Si no hay registro previo, continúa. Si ya fue enviado, se descarta."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construir el prompt para Gemini con contexto del partido y del negocio\nconst pair = $('Cruzar Negocios × Partidos').item.json;\n\nconst fechaPartido = new Date(pair.event_starts_at).toLocaleDateString('es-CO', {\n  weekday: 'long',\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric',\n  hour: '2-digit',\n  minute: '2-digit',\n  timeZone: 'America/Bogota'\n});\n\n// Extraer metadata del partido (Tiers, Focus, etc)\nconst meta = pair.event_metadata || {};\nconst focus = meta.narrative_focus || '';\nconst rivalry = meta.rivalry_context || '';\nlet playersText = '';\nif (meta.key_players) {\n  let playersArr = typeof meta.key_players === 'string' ? JSON.parse(meta.key_players) : meta.key_players;\n  if (Array.isArray(playersArr) && playersArr.length > 0) {\n    playersText = `Jugadores clave a mencionar: ${playersArr.join(', ')}. `;\n  }\n}\n\n// Determinar si Colombia juega\nconst colombiaJuega = pair.event_home_team.toLowerCase().includes('colombia') || \n                      pair.event_away_team.toLowerCase().includes('colombia');\n\nconst rival = pair.event_home_team.toLowerCase().includes('colombia') \n  ? pair.event_away_team \n  : pair.event_home_team;\n\n// Digital Identity Context\nconst audienceText = pair.target_audience && pair.target_audience.length > 0 ? ` Tu público objetivo principal es: ${pair.target_audience.join(', ')}.` : '';\nconst specialtiesText = pair.specialties && pair.specialties.length > 0 ? ` Las especialidades del local son: ${pair.specialties.join(', ')}. Menciona esto en al menos uno de los posts.` : '';\nconst promosText = pair.usual_promos && pair.usual_promos.length > 0 ? ` Sugiere alguna promoción similar a estas que solemos ofrecer: ${pair.usual_promos.join(', ')}.` : '';\nconst hashtagsText = pair.preferred_hashtags && pair.preferred_hashtags.length > 0 ? ` Incluye obligatoriamente estos hashtags al final: ${pair.preferred_hashtags.join(', ')}.` : '';\n\n// System Prompt (Tono e Identidad)\nlet systemPrompt = `Eres un experto redactor de marketing deportivo. Escribes en ${pair.preferred_language || 'Español'}. Representas a un establecimiento llamado \"${pair.business_name}\" (Tipo: ${pair.business_type}) en ${pair.city}.${audienceText}`;\n\nif (pair.tone === 'premium') {\n  systemPrompt += ' Escribe con un tono elegante, neutro y premium. Usa emojis moderados.';\n} else if (pair.tone === 'paisa') {\n  systemPrompt += ' Escribe con energía y jerga paisa auténtica de Medellín (parce, mon, ¡arriba!). Usa emojis con energía.';\n} else {\n  systemPrompt += ` Tu tono de comunicación específico debe ser: ${pair.tone}.`;\n}\nsystemPrompt += ' Tu objetivo principal es redactar captions cortos de Instagram (max 300 caracteres cada uno) para atraer público al local a ver el partido.';\n\n// User Prompt (Partido y Ángulos)\nlet userPrompt = colombiaJuega\n  ? `Crea 3 publicaciones DIFERENTES para Instagram (caption únicamente) para el negocio \"${pair.business_name}\" en ${pair.neighborhood}. El partido es: COLOMBIA 🇨🇴 vs ${rival}. Fecha: ${fechaPartido}. Liga: ${pair.event_league}. `\n  : `Crea 3 publicaciones DIFERENTES para Instagram (caption únicamente) para el negocio \"${pair.business_name}\" en ${pair.neighborhood}. Transmitirán el partido: ${pair.event_home_team} vs ${pair.event_away_team}. Fecha: ${fechaPartido}. Liga: ${pair.event_league}. `;\n\n// Inyectar narrativa del partido\nif (focus) userPrompt += `\\nEnfoque narrativo sugerido del partido: \"${focus}\". `;\nif (rivalry) userPrompt += `Contexto de rivalidad: \"${rivalry}\". `;\nif (playersText) userPrompt += playersText;\n\n// Inyectar identidad del negocio\nuserPrompt += `\\n\\nContexto del local: ${specialtiesText} ${promosText}`;\n\nuserPrompt += `\\n\\nCada publicación debe tener un ángulo diferente:\\n1) Convocatoria a ver el partido / Emoción.\\n2) Ambiente y experiencia en el local (mencionando especialidades).\\n3) Urgencia o promoción especial para el partido.\\n\\nSepara cada publicación estrictamente con ---SEPARADOR---. ${hashtagsText}`;\n\nreturn {\n  json: {\n    ...pair,\n    fecha_partido_formateada: fechaPartido,\n    colombia_juega: colombiaJuega,\n    rival: rival,\n    system_prompt: systemPrompt,\n    user_prompt: userPrompt\n  }\n};"
+      },
+      "id": "code-003-build-prompt",
+      "name": "Construir Prompt Contextual",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1500, 200]
+    },
+    {
+      "parameters": {
+        "model": "gemini-2.0-flash",
+        "prompt": "={{ $json.user_prompt }}",
+        "options": {
+          "systemInstruction": "={{ $json.system_prompt }}"
+        }
+      },
+      "id": "gemini-001-generate",
+      "name": "Gemini: Generar 3 Contenidos",
+      "type": "n8n-nodes-base.googleGemini",
+      "typeVersion": 1,
+      "position": [1700, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parsear las 3 variantes generadas por Gemini\nconst rawText = $input.first().json.text;\nconst pair = $('Construir Prompt Contextual').item.json;\n\n// Separar las 3 variantes\nconst variantes = rawText\n  .split('---SEPARADOR---')\n  .map(v => v.trim())\n  .filter(v => v.length > 0)\n  .slice(0, 3);\n\n// Si Gemini no usó el separador correctamente, dividir equitativamente\nconst contenidos = variantes.length >= 2 ? variantes : [rawText];\n\n// Formatear la fecha legible para el mensaje de WhatsApp\nconst fechaPartido = pair.fecha_partido_formateada;\nconst emoji = pair.colombia_juega ? '🇨🇴⚽' : '⚽';\n\n// Construir el mensaje completo de WhatsApp\nlet mensajeWA = `${emoji} *¡Contenido listo para ${pair.business_name}!*\\n\\n`;\nmensajeWA += `*Partido:* ${pair.event_home_team} vs ${pair.event_away_team}\\n`;\nmensajeWA += `*Cuándo:* ${fechaPartido}\\n`;\nmensajeWA += `*Liga:* ${pair.event_league}\\n\\n`;\nmensajeWA += `Aquí tienes *3 opciones de caption* para tu Instagram. Elige la que más te guste, agrega una foto del ambiente de tu local y ¡publica! 👇\\n\\n`;\nmensajeWA += `━━━━━━━━━━━━━━━━━━━━\\n`;\n\ncontenidos.forEach((c, i) => {\n  mensajeWA += `\\n*Opción ${i + 1}:*\\n${c}\\n\\n`;\n  if (i < contenidos.length - 1) mensajeWA += `━━━━━━━━━━━━━━━━━━━━\\n`;\n});\n\nmensajeWA += `\\n━━━━━━━━━━━━━━━━━━━━\\n`;\nmensajeWA += `_FanFest AI 🤖 — Copiá, personalizá y publicá. ¡Nos cuentas cómo te fue después del partido!_`;\n\nreturn {\n  json: {\n    business_id: pair.business_id,\n    event_id: pair.event_id,\n    whatsapp: pair.whatsapp,\n    business_name: pair.business_name,\n    mensaje_wa: mensajeWA,\n    contenidos_generados: contenidos,\n    raw_response: rawText,\n    system_prompt_used: pair.system_prompt,\n    user_prompt_used: pair.user_prompt\n  }\n};"
+      },
+      "id": "code-004-format",
+      "name": "Formatear Mensaje WhatsApp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1900, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WHATSAPP_ACCESS_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $json.whatsapp }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"preview_url\": false,\n    \"body\": {{ JSON.stringify($json.mensaje_wa) }}\n  }\n}",
+        "options": {}
+      },
+      "id": "http-001-send-wa",
+      "name": "Enviar Contenido por WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2100, 200]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "whatsapp_messages_log",
+        "fieldsAndValues": {
+          "columns": [
+            {
+              "column": "beta_business_id",
+              "value": "={{ $('Formatear Mensaje WhatsApp').item.json.business_id }}"
+            },
+            {
+              "column": "sports_event_id",
+              "value": "={{ $('Formatear Mensaje WhatsApp').item.json.event_id }}"
+            },
+            {
+              "column": "message_type",
+              "value": "pre_match_content"
+            },
+            {
+              "column": "wa_message_id",
+              "value": "={{ $json.messages?.[0]?.id || null }}"
+            },
+            {
+              "column": "sent_successfully",
+              "value": "={{ $json.messages && $json.messages[0]?.id ? true : false }}"
+            },
+            {
+              "column": "message_body",
+              "value": "={{ $('Formatear Mensaje WhatsApp').item.json.mensaje_wa }}"
+            },
+            {
+              "column": "ai_response_raw",
+              "value": "={{ $('Formatear Mensaje WhatsApp').item.json.raw_response }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "sb-004-log-send",
+      "name": "Registrar Envío en Log",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [2300, 200]
+    }
+  ],
+  "connections": {
+    "Cron: Revisar Partidos cada 6h": {
+      "main": [
+        [
+          {
+            "node": "Obtener Partidos Programados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener Partidos Programados": {
+      "main": [
+        [
+          {
+            "node": "Filtrar Ventana 48 Horas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar Ventana 48 Horas": {
+      "main": [
+        [
+          {
+            "node": "Obtener Negocios Activos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener Negocios Activos": {
+      "main": [
+        [
+          {
+            "node": "Cruzar Negocios × Partidos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cruzar Negocios × Partidos": {
+      "main": [
+        [
+          {
+            "node": "Verificar: ¿Ya se envió este contenido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar: ¿Ya se envió este contenido?": {
+      "main": [
+        [
+          {
+            "node": "¿Es nuevo (no enviado)?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Es nuevo (no enviado)?": {
+      "main": [
+        [
+          {
+            "node": "Construir Prompt Contextual",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Construir Prompt Contextual": {
+      "main": [
+        [
+          {
+            "node": "Gemini: Generar 3 Contenidos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini: Generar 3 Contenidos": {
+      "main": [
+        [
+          {
+            "node": "Formatear Mensaje WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Formatear Mensaje WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Enviar Contenido por WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar Contenido por WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Registrar Envío en Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,212 @@
+{
+  "name": "FanFest AI - Onboarding WhatsApp (Beta Businesses)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "beta-business-registered",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "wh-001-trigger",
+      "name": "Webhook: Nuevo Negocio Registrado",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [100, 300],
+      "notes": "Supabase Database Webhook dispara este endpoint cuando hay INSERT en beta_businesses. Configurar en Supabase: Database → Webhooks → Tabla: beta_businesses → Evento: INSERT → URL: <tu-n8n>/webhook/beta-business-registered"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extraer el registro recién insertado desde el payload de Supabase\n// Supabase DB Webhooks envían la fila en body.record\nconst record = $input.first().json.body?.record || $input.first().json.record || $input.first().json;\n\nif (!record || !record.whatsapp) {\n  throw new Error('No se encontró el registro de beta_businesses en el payload.');\n}\n\n// Limpiar y normalizar el número de WhatsApp\nlet phone = record.whatsapp.replace(/[^\\d+]/g, '');\nif (!phone.startsWith('+')) {\n  // Asumir Colombia si no tiene código de país\n  phone = '+57' + phone.replace(/^57/, '');\n}\n\nreturn {\n  json: {\n    id: record.id,\n    owner_name: record.owner_name,\n    business_name: record.business_name,\n    business_type: record.business_type,\n    neighborhood: record.neighborhood,\n    city: record.city || 'Medellín',\n    whatsapp: phone,\n    email: record.email,\n    instagram: record.instagram || '',\n    wants_free_pilot: record.wants_free_pilot,\n    created_at: record.created_at\n  }\n};"
+      },
+      "id": "code-001-parse",
+      "name": "Parsear Payload de Supabase",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [320, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construir el mensaje de bienvenida por WhatsApp\nconst data = $input.first().json;\n\nconst primerNombre = data.owner_name.split(' ')[0];\n\nconst mensaje = `🏟️ *¡Bienvenido a FanFest AI, ${primerNombre}!*\\n\\n` +\n  `Confirmamos que *${data.business_name}* ya está en la lista del piloto para el *Mundial 2026* 🇨🇴⚽\\n\\n` +\n  `Esto es lo que va a pasar:\\n` +\n  `✅ *48 horas antes* de cada partido de Colombia te enviamos aquí el contenido listo para publicar en Instagram\\n` +\n  `✅ Imagen + caption generados con IA, personalizados para tu negocio\\n` +\n  `✅ Solo debes copiar, pegar y publicar — sin complicaciones\\n\\n` +\n  `📅 *Debut Colombia:* 17 de junio\\n\\n` +\n  `Si tienes alguna pregunta, responde aquí mismo 👇\\n\\n` +\n  `_— Equipo FanFest AI, Medellín 🟡🔵❤️_`;\n\nreturn {\n  json: {\n    ...data,\n    mensaje_bienvenida: mensaje\n  }\n};"
+      },
+      "id": "code-002-message",
+      "name": "Construir Mensaje de Bienvenida",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [540, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WHATSAPP_ACCESS_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $json.whatsapp }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"preview_url\": false,\n    \"body\": {{ JSON.stringify($json.mensaje_bienvenida) }}\n  }\n}",
+        "options": {}
+      },
+      "id": "http-001-whatsapp",
+      "name": "Enviar WhatsApp de Bienvenida",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [760, 300],
+      "notes": "Requiere variables de entorno: WHATSAPP_PHONE_NUMBER_ID y WHATSAPP_ACCESS_TOKEN de Meta Business Suite → WhatsApp → API Setup"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verificar si el envío fue exitoso\nconst response = $input.first().json;\nconst businessData = $('Construir Mensaje de Bienvenida').first().json;\n\nconst exitoso = response.messages && response.messages[0]?.id;\n\nreturn {\n  json: {\n    business_id: businessData.id,\n    whatsapp_message_id: exitoso ? response.messages[0].id : null,\n    whatsapp_enviado: exitoso ? true : false,\n    whatsapp_error: exitoso ? null : JSON.stringify(response),\n    nuevo_status: 'contacted'\n  }\n};"
+      },
+      "id": "code-003-verify",
+      "name": "Verificar Envío WhatsApp",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [980, 300]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "table": "beta_businesses",
+        "filters": {
+          "conditions": [
+            {
+              "key": "id",
+              "operator": "equal",
+              "value": "={{ $json.business_id }}"
+            }
+          ]
+        },
+        "fieldsAndValues": {
+          "columns": [
+            {
+              "column": "status",
+              "value": "contacted"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "sb-001-update-status",
+      "name": "Actualizar Status a Contacted",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1200, 200],
+      "notes": "Solo actualiza si el WhatsApp fue enviado exitosamente"
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "whatsapp_messages_log",
+        "fieldsAndValues": {
+          "columns": [
+            {
+              "column": "beta_business_id",
+              "value": "={{ $('Verificar Envío WhatsApp').first().json.business_id }}"
+            },
+            {
+              "column": "message_type",
+              "value": "onboarding_welcome"
+            },
+            {
+              "column": "wa_message_id",
+              "value": "={{ $('Verificar Envío WhatsApp').first().json.whatsapp_message_id }}"
+            },
+            {
+              "column": "sent_successfully",
+              "value": "={{ $('Verificar Envío WhatsApp').first().json.whatsapp_enviado }}"
+            },
+            {
+              "column": "error_details",
+              "value": "={{ $('Verificar Envío WhatsApp').first().json.whatsapp_error }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "sb-002-log",
+      "name": "Registrar en Log de WhatsApp",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1200, 400],
+      "notes": "Requiere tabla whatsapp_messages_log — ver migration 006_schema_whatsapp_log.sql"
+    }
+  ],
+  "connections": {
+    "Webhook: Nuevo Negocio Registrado": {
+      "main": [
+        [
+          {
+            "node": "Parsear Payload de Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear Payload de Supabase": {
+      "main": [
+        [
+          {
+            "node": "Construir Mensaje de Bienvenida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construir Mensaje de Bienvenida": {
+      "main": [
+        [
+          {
+            "node": "Enviar WhatsApp de Bienvenida",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar WhatsApp de Bienvenida": {
+      "main": [
+        [
+          {
+            "node": "Verificar Envío WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Envío WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Actualizar Status a Contacted",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Registrar en Log de WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

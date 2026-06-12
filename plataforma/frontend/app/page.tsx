@@ -30,6 +30,15 @@ export default function LandingPage() {
     current_promo_methods: [] as string[],
     world_cup_interest: [] as string[],
     wants_free_pilot: true,
+    
+    // Identidad Digital
+    target_audience: [] as string[],
+    communication_tone: "",
+    specialties: "",
+    usual_promos: "",
+    preferred_hashtags: "",
+    active_social_networks: [] as string[],
+    preferred_language: "Español",
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -39,7 +48,7 @@ export default function LandingPage() {
       const checked = (e.target as HTMLInputElement).checked;
       
       // Handle arrays (multiple checkboxes)
-      if (name === "current_promo_methods" || name === "world_cup_interest") {
+      if (name === "current_promo_methods" || name === "world_cup_interest" || name === "target_audience" || name === "active_social_networks") {
         setFormData(prev => {
           const arr = prev[name];
           if (checked) {
@@ -65,8 +74,15 @@ export default function LandingPage() {
     setIsSubmitting(true);
 
     try {
+      const submissionData = {
+        ...formData,
+        specialties: formData.specialties.split(',').map(s => s.trim()).filter(Boolean),
+        usual_promos: formData.usual_promos.split(',').map(s => s.trim()).filter(Boolean),
+        preferred_hashtags: formData.preferred_hashtags.split(',').map(s => s.trim()).filter(Boolean)
+      };
+
       const { error } = await (supabase.from('beta_businesses') as any).insert([
-        formData,
+        submissionData,
       ]);
 
       if (error) throw error;
@@ -116,9 +132,14 @@ export default function LandingPage() {
           <span className="w-3 h-3 bg-[#c6ff00] rounded-sm"></span>
           FANFEST<span className="text-zinc-500">AI</span>
         </div>
-        <a href="#beta-form" className="text-xs font-bold text-[#c6ff00] border border-[#c6ff00]/30 px-4 py-2 rounded-full hover:bg-[#c6ff00]/10 transition-colors">
-          Acceso Beta
-        </a>
+        <div className="flex items-center gap-3">
+          <a href="/login" className="text-xs font-semibold text-zinc-400 hover:text-white transition-colors px-3 py-2">
+            Acceder →
+          </a>
+          <a href="#beta-form" className="text-xs font-bold text-[#c6ff00] border border-[#c6ff00]/30 px-4 py-2 rounded-full hover:bg-[#c6ff00]/10 transition-colors">
+            Acceso Beta
+          </a>
+        </div>
       </nav>
 
       <main className="relative z-10">
@@ -217,6 +238,7 @@ export default function LandingPage() {
                   <div className={`h-1.5 flex-1 rounded-full ${step >= 1 ? 'bg-[#c6ff00]' : 'bg-zinc-800'}`}></div>
                   <div className={`h-1.5 flex-1 rounded-full ${step >= 2 ? 'bg-[#c6ff00]' : 'bg-zinc-800'}`}></div>
                   <div className={`h-1.5 flex-1 rounded-full ${step >= 3 ? 'bg-[#c6ff00]' : 'bg-zinc-800'}`}></div>
+                  <div className={`h-1.5 flex-1 rounded-full ${step >= 4 ? 'bg-[#c6ff00]' : 'bg-zinc-800'}`}></div>
                 </div>
 
                 {/* STEP 1: Datos del Responsable */}
@@ -330,11 +352,85 @@ export default function LandingPage() {
                   </div>
                 )}
 
-                {/* STEP 3: Validación */}
+                {/* STEP 3: Identidad Digital */}
                 {step === 3 && (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
                     <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
                       <span className="w-6 h-6 rounded-full bg-[#c6ff00]/20 text-[#c6ff00] flex items-center justify-center text-xs">3</span>
+                      Identidad Digital (IA)
+                    </h3>
+                    
+                    <p className="text-sm text-zinc-400 mb-6">Esta información ayudará a FanFest AI a generar mensajes que suenen exactamente como tu marca.</p>
+
+                    <div className="space-y-4">
+                      <label className="text-sm font-bold text-white block">Público Objetivo (Elige varios)</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {['Jóvenes (18-25)', 'Adultos Jóvenes (25-35)', 'Adultos (35-50)', 'Familias', 'Ejecutivos', 'Turistas', 'Estudiantes'].map(audience => (
+                          <label key={audience} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${formData.target_audience.includes(audience) ? 'bg-[#c6ff00]/10 border-[#c6ff00]' : 'bg-[#12131a] border-zinc-800 hover:border-zinc-700'}`}>
+                            <input type="checkbox" name="target_audience" value={audience} checked={formData.target_audience.includes(audience)} onChange={handleChange} className="hidden" />
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center ${formData.target_audience.includes(audience) ? 'bg-[#c6ff00] border-[#c6ff00]' : 'border-zinc-600'}`}>
+                              {formData.target_audience.includes(audience) && <span className="text-black text-[10px]">✓</span>}
+                            </div>
+                            <span className="text-sm text-zinc-300">{audience}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Tono de Comunicación *</label>
+                        <select required name="communication_tone" value={formData.communication_tone} onChange={handleChange} className="w-full bg-[#12131a] border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#c6ff00] transition-colors">
+                          <option value="">Selecciona...</option>
+                          <option value="Formal">Formal</option>
+                          <option value="Informal">Informal / Relajado</option>
+                          <option value="Humorístico">Humorístico</option>
+                          <option value="Apasionado">Apasionado / Futbolero</option>
+                          <option value="Sofisticado">Sofisticado / Premium</option>
+                          <option value="paisa">Paisa / Local</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Idioma Principal *</label>
+                        <select required name="preferred_language" value={formData.preferred_language} onChange={handleChange} className="w-full bg-[#12131a] border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#c6ff00] transition-colors">
+                          <option value="Español">Español</option>
+                          <option value="Inglés">Inglés</option>
+                          <option value="Bilingüe">Bilingüe</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 mt-6">
+                      <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Especialidades de la Casa</label>
+                      <input type="text" name="specialties" value={formData.specialties} onChange={handleChange} className="w-full bg-[#12131a] border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#c6ff00] transition-colors" placeholder="Ej. Cerveza artesanal, Alitas BBQ, Pantalla gigante (Separado por comas)" />
+                    </div>
+
+                    <div className="space-y-2 mt-6">
+                      <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Promociones Habituales</label>
+                      <input type="text" name="usual_promos" value={formData.usual_promos} onChange={handleChange} className="w-full bg-[#12131a] border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#c6ff00] transition-colors" placeholder="Ej. 2x1 en cócteles, Happy Hour, Descuento en picadas" />
+                    </div>
+
+                    <div className="space-y-2 mt-6">
+                      <label className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Hashtags Preferidos (Opcional)</label>
+                      <input type="text" name="preferred_hashtags" value={formData.preferred_hashtags} onChange={handleChange} className="w-full bg-[#12131a] border border-zinc-800 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#c6ff00] transition-colors" placeholder="Ej. #MiBar, #FutbolMedellin" />
+                    </div>
+
+                    <div className="flex gap-4 mt-8">
+                      <button type="button" onClick={prevStep} className="px-6 bg-zinc-800 text-white font-bold py-3.5 rounded-lg hover:bg-zinc-700 transition-colors">
+                        Atrás
+                      </button>
+                      <button type="button" onClick={nextStep} className="flex-1 bg-white text-black font-bold py-3.5 rounded-lg hover:bg-zinc-200 transition-colors">
+                        Continuar →
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* STEP 4: Validación */}
+                {step === 4 && (
+                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+                    <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-[#c6ff00]/20 text-[#c6ff00] flex items-center justify-center text-xs">4</span>
                       Tus Objetivos
                     </h3>
                     

@@ -16,12 +16,29 @@ type Toast = { id: number; type: "success" | "error" | "loading"; message: strin
 export default function Home() {
   const [selectedNeighborhood, setSelectedNeighborhood] = useState("laureles");
   const [selectedTone, setSelectedTone] = useState("paisa");
+
+  // Detect query parameters on mount to support deep linking from /app/dashboard
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const urlNeighborhood = params.get("neighborhood");
+      const urlTone = params.get("tone");
+      
+      if (urlNeighborhood) {
+        setSelectedNeighborhood(urlNeighborhood.toLowerCase());
+      }
+      if (urlTone) {
+        setSelectedTone(urlTone.toLowerCase());
+      }
+    }
+  }, []);
   
   // Database States
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [activeEvent, setActiveEvent] = useState<SportsEvent | null>(null);
   const [activeCampaign, setActiveCampaign] = useState<Campaign | null>(null);
   const [aiGenerations, setAiGenerations] = useState<AiGeneration[]>([]);
+  const [crmData, setCrmData] = useState<any[]>([]);
   
   // UI States (with mock fallbacks)
   const [scoreColombia, setscoreColombia] = useState(1);
@@ -53,6 +70,13 @@ export default function Home() {
           .limit(1);
 
         if (eventError) throw eventError;
+
+        const { data: crmFetch, error: crmError } = await supabase
+          .from("v_pilot_crm_dashboard")
+          .select("*")
+          .order("registered_at", { ascending: false });
+
+        if (!crmError && crmFetch) setCrmData(crmFetch);
         
         if (eventData && eventData.length > 0) {
           const mainEvent = eventData[0] as SportsEvent;
@@ -97,6 +121,33 @@ export default function Home() {
       supabase.removeChannel(channel);
     };
   }, [activeEvent?.id]);
+
+  // 2.5. Realtime Listener: Subscribe to changes in the active campaign
+  useEffect(() => {
+    if (!activeCampaign?.id) return;
+
+    const channel = supabase
+      .channel(`campaign-${activeCampaign.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "campaigns",
+          filter: `id=eq.${activeCampaign.id}`,
+        },
+        (payload: any) => {
+          const updatedCampaign = payload.new as Campaign;
+          setActiveCampaign(updatedCampaign);
+          setCampaignApproved(updatedCampaign.status === "published" || updatedCampaign.status === "approved");
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeCampaign?.id]);
 
   // 3. Campaign Sync: Fetch campaign and generations based on chosen neighborhood and event
   useEffect(() => {
@@ -302,20 +353,24 @@ export default function Home() {
 
   const handleApprove = async () => {
     if (activeCampaign?.id) {
+      const loadingId = addToast("loading", "🚀 Enviando aprobación de campaña...");
       try {
         const { error } = await supabase
           .from("campaigns")
           .update({
-            status: "published",
+            status: "approved",
             approved_at: new Date().toISOString(),
           } as any)
           .eq("id", activeCampaign.id);
 
         if (error) throw error;
+        removeToast(loadingId as unknown as number);
+        addToast("success", "✅ Campaña aprobada. Publicando en redes sociales...");
         setCampaignApproved(true);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error approving campaign in Supabase:", error);
-        setCampaignApproved(true);
+        removeToast(loadingId as unknown as number);
+        addToast("error", `❌ Error al aprobar campaña: ${error.message || "Error desconocido"}`);
       }
     } else {
       setCampaignApproved(true);
@@ -353,23 +408,36 @@ export default function Home() {
 
       {/* Navigation Header */}
       <header className="border-b border-zinc-800 bg-[#0c0d12]/80 backdrop-blur-md sticky top-0 z-50">
+        {/* Demo mode banner */}
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-1.5 text-center">
+          <p className="text-[11px] text-amber-400 font-medium">
+            👁️ Modo Demo — Estás viendo datos de ejemplo.{" "}
+            <a href="/login" className="underline font-bold hover:text-amber-300 transition-colors">
+              Accede a tu panel real →
+            </a>
+          </p>
+        </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-[#c6ff00] text-black font-extrabold px-3 py-1 rounded-sm tracking-wider text-sm flex items-center gap-1.5 shadow-[0_0_15px_rgba(198,255,0,0.25)]">
               <span className="w-2 h-2 rounded-full bg-black animate-pulse"></span>
               FANFEST AI
             </div>
-            <span className="text-xs text-zinc-500 hidden sm:inline">v1.0 MVP — Medellín</span>
+            <span className="text-xs text-zinc-500 hidden sm:inline">Demo Interactivo</span>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-xs bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-full border border-emerald-500/20">
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2 text-xs bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-full border border-emerald-500/20">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
               Live Sports API Connected
             </div>
-            <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-[#c6ff00]">
-              JB
-            </div>
+            <a
+              href="/login"
+              id="header-login-btn"
+              className="text-xs font-bold text-[#c6ff00] border border-[#c6ff00]/30 px-4 py-2 rounded-lg hover:bg-[#c6ff00]/10 transition-colors"
+            >
+              Acceder
+            </a>
           </div>
         </div>
       </header>
@@ -550,10 +618,15 @@ export default function Home() {
                   <h3 className="text-md font-bold text-white mt-1">Campaña Contextual Lista</h3>
                 </div>
                 {activeCampaign ? (
-                  activeCampaign.status === "published" || activeCampaign.status === "approved" ? (
+                  activeCampaign.status === "published" ? (
                     <div className="text-xs text-emerald-400 flex items-center gap-1.5 self-start sm:self-center">
                       <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
                       Publicado
+                    </div>
+                  ) : activeCampaign.status === "approved" ? (
+                    <div className="text-xs text-amber-400 flex items-center gap-1.5 self-start sm:self-center">
+                      <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                      Publicando...
                     </div>
                   ) : (
                     <div className="text-xs text-zinc-400 flex items-center gap-1.5 self-start sm:self-center">
@@ -665,7 +738,26 @@ export default function Home() {
                 </div>
 
                 <div>
-                  {campaignApproved ? (
+                  {activeCampaign ? (
+                    activeCampaign.status === "published" ? (
+                      <div className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2">
+                        ✅ ¡Publicado Exitosamente en Instagram!
+                      </div>
+                    ) : activeCampaign.status === "approved" ? (
+                      <div className="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2">
+                        <span className="w-3.5 h-3.5 rounded-full border-2 border-amber-400 border-t-transparent animate-spin mr-1" />
+                        ⏳ Publicando en Instagram...
+                      </div>
+                    ) : (
+                      <button
+                        id="approve-publish-btn"
+                        onClick={handleApprove}
+                        className="bg-[#c6ff00] hover:bg-[#b0e000] text-black text-xs font-extrabold py-2.5 px-6 rounded-lg transition-all shadow-[0_4px_20px_rgba(198,255,0,0.35)] active:scale-[0.98] hover:shadow-[0_4px_25px_rgba(198,255,0,0.5)]"
+                      >
+                        🚀 Aprobar y Publicar en Instagram
+                      </button>
+                    )
+                  ) : campaignApproved ? (
                     <div className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2">
                       ✅ ¡Publicado Exitosamente en Instagram!
                     </div>
@@ -721,6 +813,87 @@ export default function Home() {
           </div>
 
         </div>
+
+        {/* CRM Dashboard Section (MVP Pilot) */}
+        <div className="mt-12 bg-[#0c0d12] border border-zinc-800 rounded-xl overflow-hidden shadow-xl">
+          <div className="bg-[#12131a] px-6 py-4 border-b border-zinc-800 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                📋 CRM Piloto Medellín (WhatsApp)
+              </h2>
+              <p className="text-xs text-zinc-400 mt-1">Estado de onboarding y follow-up de negocios beta.</p>
+            </div>
+            <div className="text-xs bg-[#c6ff00]/10 text-[#c6ff00] px-3 py-1 rounded-full font-bold border border-[#c6ff00]/20">
+              {crmData.length} Negocios Registrados
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-[#161720] text-zinc-400 text-xs uppercase tracking-wider font-semibold">
+                  <th className="p-4 border-b border-zinc-800">Negocio</th>
+                  <th className="p-4 border-b border-zinc-800">Sede</th>
+                  <th className="p-4 border-b border-zinc-800">Status CRM</th>
+                  <th className="p-4 border-b border-zinc-800">Bienvenida WA</th>
+                  <th className="p-4 border-b border-zinc-800">Contenido Enviado</th>
+                  <th className="p-4 border-b border-zinc-800">Follow-up Resp.</th>
+                </tr>
+              </thead>
+              <tbody className="text-sm">
+                {crmData.length > 0 ? (
+                  crmData.map((row: any) => (
+                    <tr key={row.business_id} className="border-b border-zinc-800/50 hover:bg-[#12131a]/50 transition-colors">
+                      <td className="p-4">
+                        <div className="font-bold text-white">{row.business_name}</div>
+                        <div className="text-xs text-zinc-500">{row.owner_name} • {row.whatsapp}</div>
+                      </td>
+                      <td className="p-4">
+                        <span className="capitalize">{row.neighborhood}</span>
+                        <div className="text-xs text-zinc-500 capitalize">{row.business_type}</div>
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${
+                          row.crm_status === 'contacted' ? 'bg-amber-500/10 text-amber-500' :
+                          row.crm_status === 'pilot_active' ? 'bg-[#c6ff00]/10 text-[#c6ff00]' :
+                          'bg-zinc-800 text-zinc-400'
+                        }`}>
+                          {row.crm_status}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        {row.welcome_sent ? (
+                          <span className="text-emerald-400 font-bold flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Sí</span>
+                        ) : (
+                          <span className="text-zinc-500">Pendiente</span>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <div className="font-mono text-zinc-300">{row.pre_match_contents_sent} Partidos</div>
+                      </td>
+                      <td className="p-4">
+                        {row.confirmed_publications > 0 ? (
+                          <span className="text-emerald-400 font-bold flex items-center gap-1.5">✅ Publicó ({row.confirmed_publications})</span>
+                        ) : row.followups_sent > 0 ? (
+                          <span className="text-amber-500">Esperando resp.</span>
+                        ) : (
+                          <span className="text-zinc-500">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-zinc-500 text-sm">
+                      Aún no hay negocios registrados en el piloto. Envía la landing page.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </main>
 
       {/* Footer */}

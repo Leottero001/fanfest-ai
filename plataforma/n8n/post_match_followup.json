@@ -1,0 +1,389 @@
+{
+  "name": "FanFest AI - Post-Match Follow-Up & CRM Update",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 2
+            }
+          ]
+        }
+      },
+      "id": "cron-001-trigger",
+      "name": "Cron: Revisar Partidos Finalizados (cada 2h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [100, 300],
+      "notes": "Corre cada 2 horas. Busca partidos que terminaron en las últimas 26 horas y a los que aún no se les ha enviado el follow-up."
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": "sports_events",
+        "options": {},
+        "filters": {
+          "conditions": [
+            {
+              "key": "status",
+              "operator": "equal",
+              "value": "finished"
+            }
+          ]
+        }
+      },
+      "id": "sb-001-finished-events",
+      "name": "Obtener Partidos Finalizados",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [300, 300],
+      "notes": "Trae partidos con status=finished"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filtrar partidos que terminaron entre 20 y 26 horas atrás\n// (ventana para enviar el follow-up ~24h después del partido)\nconst events = $input.all();\nconst now = new Date();\n\nconst targetEvents = events.filter(item => {\n  const updatedAt = new Date(item.json.updated_at);\n  const diffMs = now - updatedAt;\n  const diffHours = diffMs / (1000 * 60 * 60);\n  // Partidos que terminaron entre 20 y 26 horas\n  return diffHours >= 20 && diffHours <= 26;\n});\n\nconsole.log(`Partidos en ventana follow-up: ${targetEvents.length}`);\nreturn targetEvents.map(e => ({ json: e.json }));"
+      },
+      "id": "code-001-filter-followup",
+      "name": "Filtrar Ventana Follow-up (20-26h post partido)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": "whatsapp_messages_log",
+        "options": {},
+        "filters": {
+          "conditions": [
+            {
+              "key": "sports_event_id",
+              "operator": "equal",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "key": "message_type",
+              "operator": "equal",
+              "value": "pre_match_content"
+            },
+            {
+              "key": "sent_successfully",
+              "operator": "equal",
+              "value": true
+            }
+          ]
+        }
+      },
+      "id": "sb-002-get-sent-logs",
+      "name": "Obtener Logs de Contenido Enviado",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [700, 300],
+      "notes": "Para cada partido, busca qué negocios recibieron el contenido pre-partido exitosamente"
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": "whatsapp_messages_log",
+        "options": {},
+        "filters": {
+          "conditions": [
+            {
+              "key": "beta_business_id",
+              "operator": "equal",
+              "value": "={{ $json.beta_business_id }}"
+            },
+            {
+              "key": "sports_event_id",
+              "operator": "equal",
+              "value": "={{ $json.sports_event_id }}"
+            },
+            {
+              "key": "message_type",
+              "operator": "equal",
+              "value": "post_match_followup"
+            }
+          ]
+        }
+      },
+      "id": "sb-003-check-followup-sent",
+      "name": "¿Ya se envió el Follow-up?",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "not-sent",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "empty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-001-not-sent",
+      "name": "¿Follow-up Pendiente?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": "beta_businesses",
+        "options": {},
+        "filters": {
+          "conditions": [
+            {
+              "key": "id",
+              "operator": "equal",
+              "value": "={{ $('Obtener Logs de Contenido Enviado').item.json.beta_business_id }}"
+            }
+          ]
+        }
+      },
+      "id": "sb-004-get-business",
+      "name": "Obtener Datos del Negocio",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1300, 200]
+    },
+    {
+      "parameters": {
+        "operation": "select",
+        "table": "sports_events",
+        "options": {},
+        "filters": {
+          "conditions": [
+            {
+              "key": "id",
+              "operator": "equal",
+              "value": "={{ $('Obtener Logs de Contenido Enviado').item.json.sports_event_id }}"
+            }
+          ]
+        }
+      },
+      "id": "sb-005-get-event-result",
+      "name": "Obtener Resultado del Partido",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1300, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construir el mensaje de follow-up con resultado real del partido\nconst biz = $('Obtener Datos del Negocio').first().json;\nconst event = $('Obtener Resultado del Partido').first().json;\nconst log = $('Obtener Logs de Contenido Enviado').item.json;\n\nconst primerNombre = biz.owner_name.split(' ')[0];\n\n// Determinar resultado para Colombia\nconst colombiaJuega = event.home_team.toLowerCase().includes('colombia') || \n                      event.away_team.toLowerCase().includes('colombia');\n\nlet resultadoTexto = '';\nif (colombiaJuega) {\n  const colombiaEsLocal = event.home_team.toLowerCase().includes('colombia');\n  const golesCol = colombiaEsLocal ? event.home_score : event.away_score;\n  const golesRival = colombiaEsLocal ? event.away_score : event.home_score;\n  const rival = colombiaEsLocal ? event.away_team : event.home_team;\n  \n  if (golesCol > golesRival) {\n    resultadoTexto = `🇨🇴 *¡Colombia ganó ${golesCol}-${golesRival} vs ${rival}!* ¡Qué noche tan bacana! 🎉`;\n  } else if (golesCol < golesRival) {\n    resultadoTexto = `😔 Colombia perdió ${golesCol}-${golesRival} vs ${rival}. Se levantará.`;\n  } else {\n    resultadoTexto = `🤝 Empate ${golesCol}-${golesRival} vs ${rival}. ¡Se siente!`;\n  }\n} else {\n  resultadoTexto = `⚽ El partido ${event.home_team} vs ${event.away_team} terminó ${event.home_score}-${event.away_score}.`;\n}\n\nconst mensaje = `Hola ${primerNombre}! 👋\\n\\n` +\n  `${resultadoTexto}\\n\\n` +\n  `Hace 24 horas te enviamos el contenido para ${biz.business_name} 📱\\n\\n` +\n  `*¿Lograste publicar alguno de los contenidos en Instagram?*\\n\\n` +\n  `Responde con:\\n` +\n  `✅ *SÍ* — Lo publiqué\\n` +\n  `📸 *FOTO* — Lo publiqué y acá te mando la evidencia\\n` +\n  `❌ *NO* — No pude publicarlo\\n` +\n  `⏳ *LUEGO* — Lo publicaré más tarde\\n\\n` +\n  `Tu respuesta nos ayuda a mejorar el contenido para el próximo partido 🙌\\n\\n` +\n  `_— Equipo FanFest AI_`;\n\nreturn {\n  json: {\n    beta_business_id: biz.id,\n    sports_event_id: event.id,\n    business_name: biz.business_name,\n    whatsapp: biz.whatsapp,\n    mensaje_followup: mensaje,\n    pre_match_log_id: log.id\n  }\n};"
+      },
+      "id": "code-002-build-followup",
+      "name": "Construir Mensaje Follow-up",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1500, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v19.0/{{ $env.WHATSAPP_PHONE_NUMBER_ID }}/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.WHATSAPP_ACCESS_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"messaging_product\": \"whatsapp\",\n  \"to\": \"{{ $json.whatsapp }}\",\n  \"type\": \"text\",\n  \"text\": {\n    \"preview_url\": false,\n    \"body\": {{ JSON.stringify($json.mensaje_followup) }}\n  }\n}",
+        "options": {}
+      },
+      "id": "http-001-send-followup",
+      "name": "Enviar WhatsApp Follow-up",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1700, 300]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "table": "whatsapp_messages_log",
+        "fieldsAndValues": {
+          "columns": [
+            {
+              "column": "beta_business_id",
+              "value": "={{ $('Construir Mensaje Follow-up').item.json.beta_business_id }}"
+            },
+            {
+              "column": "sports_event_id",
+              "value": "={{ $('Construir Mensaje Follow-up').item.json.sports_event_id }}"
+            },
+            {
+              "column": "message_type",
+              "value": "post_match_followup"
+            },
+            {
+              "column": "wa_message_id",
+              "value": "={{ $json.messages?.[0]?.id || null }}"
+            },
+            {
+              "column": "sent_successfully",
+              "value": "={{ $json.messages && $json.messages[0]?.id ? true : false }}"
+            },
+            {
+              "column": "message_body",
+              "value": "={{ $('Construir Mensaje Follow-up').item.json.mensaje_followup }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "sb-006-log-followup",
+      "name": "Registrar Follow-up en Log",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1900, 300]
+    }
+  ],
+  "connections": {
+    "Cron: Revisar Partidos Finalizados (cada 2h)": {
+      "main": [
+        [
+          {
+            "node": "Obtener Partidos Finalizados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener Partidos Finalizados": {
+      "main": [
+        [
+          {
+            "node": "Filtrar Ventana Follow-up (20-26h post partido)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtrar Ventana Follow-up (20-26h post partido)": {
+      "main": [
+        [
+          {
+            "node": "Obtener Logs de Contenido Enviado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener Logs de Contenido Enviado": {
+      "main": [
+        [
+          {
+            "node": "¿Ya se envió el Follow-up?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Ya se envió el Follow-up?": {
+      "main": [
+        [
+          {
+            "node": "¿Follow-up Pendiente?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Follow-up Pendiente?": {
+      "main": [
+        [
+          {
+            "node": "Obtener Datos del Negocio",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Obtener Resultado del Partido",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Obtener Datos del Negocio": {
+      "main": [
+        [
+          {
+            "node": "Construir Mensaje Follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener Resultado del Partido": {
+      "main": [
+        [
+          {
+            "node": "Construir Mensaje Follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Construir Mensaje Follow-up": {
+      "main": [
+        [
+          {
+            "node": "Enviar WhatsApp Follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar WhatsApp Follow-up": {
+      "main": [
+        [
+          {
+            "node": "Registrar Follow-up en Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

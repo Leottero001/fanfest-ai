@@ -1,0 +1,391 @@
+{
+  "name": "FanFest AI — WhatsApp Webhook Receiver",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "wa-incoming",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook-verify",
+      "name": "Meta Webhook Verification (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [0, 0],
+      "webhookId": "wa-incoming"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "verify-token-check",
+              "leftValue": "={{ $json.query['hub.verify_token'] }}",
+              "rightValue": "={{ $env.WA_VERIFY_TOKEN }}",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-check-verify-token",
+      "name": "Token Válido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.challenge'] }}",
+        "options": { "responseCode": 200 }
+      },
+      "id": "node-respond-challenge",
+      "name": "Responder Challenge (200)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [440, -80]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Forbidden",
+        "options": { "responseCode": 403 }
+      },
+      "id": "node-respond-forbidden",
+      "name": "Responder Forbidden (403)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [440, 80]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wa-incoming",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-webhook-post",
+      "name": "Meta Webhook Receiver (POST)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [0, 300],
+      "webhookId": "wa-incoming"
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "OK",
+        "options": { "responseCode": 200 }
+      },
+      "id": "node-ack-200",
+      "name": "Ack 200 (Inmediato a Meta)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [220, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Meta WhatsApp Business webhook payload\n// Docs: https://developers.facebook.com/docs/whatsapp/cloud-api/webhooks/payload-examples\n\nconst body = $input.first().json.body;\n\nif (!body || body.object !== 'whatsapp_business_account') {\n  return [{ json: { skip: true, reason: 'Not a WA Business event' } }];\n}\n\nconst results = [];\n\nfor (const entry of (body.entry || [])) {\n  for (const change of (entry.changes || [])) {\n    if (change.field !== 'messages') continue;\n\n    const value = change.value;\n    const messages = value?.messages || [];\n\n    for (const msg of messages) {\n      if (msg.type !== 'text') continue; // Only process text replies\n\n      const fromNumber = msg.from;  // E.164 format: '573001234567'\n      const text = msg.text?.body?.trim().toUpperCase() || '';\n      const waMessageId = msg.id;\n      const timestamp = new Date(parseInt(msg.timestamp) * 1000).toISOString();\n\n      // Normalize response — map common variants to canonical values\n      let normalizedResponse = text;\n      if (['SI', 'SÍ', 'YES', 'S', 'SI!', 'SÍ!', 'CLARO', 'DALE', 'OK'].some(k => text.includes(k))) {\n        normalizedResponse = 'SÍ';\n      } else if (['FOTO', 'FOTO!', 'ACÁ', 'ACA', 'VE', 'ENVIANDO'].some(k => text.includes(k))) {\n        normalizedResponse = 'FOTO';\n      } else if (['NO', 'NO!', 'NAH', 'NEG'].some(k => text.startsWith(k))) {\n        normalizedResponse = 'NO';\n      } else if (['LUEGO', 'DESPUÉS', 'DESPUES', 'MÁS TARDE', 'MAS TARDE'].some(k => text.includes(k))) {\n        normalizedResponse = 'LUEGO';\n      }\n\n      results.push({\n        json: {\n          fromNumber,\n          originalText: msg.text?.body?.trim(),\n          normalizedResponse,\n          waMessageId,\n          timestamp,\n          waAccountId: value?.metadata?.phone_number_id,\n        }\n      });\n    }\n  }\n}\n\nif (results.length === 0) {\n  return [{ json: { skip: true, reason: 'No processable text messages in payload' } }];\n}\n\nreturn results;\n"
+      },
+      "id": "node-parse-payload",
+      "name": "Parsear Payload Meta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [220, 380]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "skip-check",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "notEquals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-check-skip",
+      "name": "¿Hay mensajes útiles?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 380]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "beta_businesses",
+        "returnAll": false,
+        "limit": 1,
+        "filterByFormula": "={{ `whatsapp.ilike.%${$json.fromNumber.slice(-10)}` }}",
+        "options": {}
+      },
+      "id": "node-find-business",
+      "name": "Buscar Negocio por Teléfono",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [660, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-credentials",
+          "name": "FanFest AI Supabase"
+        }
+      },
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "beta_businesses",
+        "returnAll": false,
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "whatsapp",
+              "condition": "ilike",
+              "keyValue": "={{ '%' + $json.fromNumber.slice(-10) }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "id": "business-found-check",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": { "type": "string", "operation": "notEmpty" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-check-business",
+      "name": "¿Negocio encontrado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "whatsapp_messages_log",
+        "returnAll": false,
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "beta_business_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Buscar Negocio por Teléfono').first().json.id }}"
+            },
+            {
+              "keyName": "message_type",
+              "condition": "in",
+              "keyValue": "post_match_followup,pre_match_content"
+            },
+            {
+              "keyName": "sent_successfully",
+              "condition": "eq",
+              "keyValue": true
+            },
+            {
+              "keyName": "recipient_response",
+              "condition": "is",
+              "keyValue": "null"
+            }
+          ]
+        },
+        "sort": {
+          "fields": [
+            { "fieldName": "created_at", "order": "DESC" }
+          ]
+        }
+      },
+      "id": "node-find-last-message",
+      "name": "Buscar Último Mensaje sin Respuesta",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1100, 220],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-credentials",
+          "name": "FanFest AI Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "whatsapp_messages_log",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Buscar Último Mensaje sin Respuesta').first().json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldName": "recipient_response", "fieldValue": "={{ $('Parsear Payload Meta').first().json.normalizedResponse }}" },
+            { "fieldName": "response_received_at", "fieldValue": "={{ $('Parsear Payload Meta').first().json.timestamp }}" }
+          ]
+        }
+      },
+      "id": "node-update-response",
+      "name": "Guardar Respuesta en Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1320, 220],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-credentials",
+          "name": "FanFest AI Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {},
+          "conditions": [
+            {
+              "id": "positive-response-check",
+              "leftValue": "={{ $('Parsear Payload Meta').first().json.normalizedResponse }}",
+              "rightValue": "NO",
+              "operator": { "type": "string", "operation": "notEquals" }
+            },
+            {
+              "id": "not-luego",
+              "leftValue": "={{ $('Parsear Payload Meta').first().json.normalizedResponse }}",
+              "rightValue": "LUEGO",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-check-positive",
+      "name": "¿Respuesta Positiva?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1540, 220]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "beta_businesses",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Buscar Negocio por Teléfono').first().json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            { "fieldName": "status", "fieldValue": "pilot_active" }
+          ]
+        }
+      },
+      "id": "node-update-crm-status",
+      "name": "Actualizar CRM → pilot_active",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1760, 140],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-credentials",
+          "name": "FanFest AI Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Log para debugging — respuesta negativa procesada\nconst response = $('Parsear Payload Meta').first().json.normalizedResponse;\nconst business = $('Buscar Negocio por Teléfono').first().json.business_name;\nconsole.log(`[WA Webhook] Respuesta '${response}' de ${business} — sin acción adicional requerida.`);\nreturn $input.all();\n"
+      },
+      "id": "node-log-negative",
+      "name": "Log Respuesta Negativa",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 300]
+    }
+  ],
+  "connections": {
+    "Meta Webhook Verification (GET)": {
+      "main": [[{ "node": "Token Válido?", "type": "main", "index": 0 }]]
+    },
+    "Token Válido?": {
+      "main": [
+        [{ "node": "Responder Challenge (200)", "type": "main", "index": 0 }],
+        [{ "node": "Responder Forbidden (403)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Meta Webhook Receiver (POST)": {
+      "main": [
+        [
+          { "node": "Ack 200 (Inmediato a Meta)", "type": "main", "index": 0 },
+          { "node": "Parsear Payload Meta", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Parsear Payload Meta": {
+      "main": [[{ "node": "¿Hay mensajes útiles?", "type": "main", "index": 0 }]]
+    },
+    "¿Hay mensajes útiles?": {
+      "main": [
+        [{ "node": "Buscar Negocio por Teléfono", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Buscar Negocio por Teléfono": {
+      "main": [[{ "node": "¿Negocio encontrado?", "type": "main", "index": 0 }]]
+    },
+    "¿Negocio encontrado?": {
+      "main": [
+        [{ "node": "Buscar Último Mensaje sin Respuesta", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Buscar Último Mensaje sin Respuesta": {
+      "main": [[{ "node": "Guardar Respuesta en Supabase", "type": "main", "index": 0 }]]
+    },
+    "Guardar Respuesta en Supabase": {
+      "main": [[{ "node": "¿Respuesta Positiva?", "type": "main", "index": 0 }]]
+    },
+    "¿Respuesta Positiva?": {
+      "main": [
+        [{ "node": "Actualizar CRM → pilot_active", "type": "main", "index": 0 }],
+        [{ "node": "Log Respuesta Negativa", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [{ "createdAt": "2026-06-10", "name": "whatsapp" }, { "createdAt": "2026-06-10", "name": "webhook" }],
+  "triggerCount": 2,
+  "updatedAt": "2026-06-10",
+  "versionId": "1"
+}
