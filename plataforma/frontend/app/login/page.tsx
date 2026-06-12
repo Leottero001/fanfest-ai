@@ -4,9 +4,12 @@ import { useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 
 type LoginStep = "form" | "sent" | "error";
+type LoginMode = "magic_link" | "password";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginMode, setLoginMode] = useState<LoginMode>("magic_link");
   const [step, setStep] = useState<LoginStep>("form");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -19,30 +22,46 @@ export default function LoginPage() {
     setErrorMsg("");
 
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim().toLowerCase(),
-        options: {
-          emailRedirectTo: `${window.location.origin}/app/dashboard`,
-          shouldCreateUser: false, // Solo deja entrar a usuarios ya registrados
-        },
-      });
+      if (loginMode === "magic_link") {
+        const { error } = await supabase.auth.signInWithOtp({
+          email: email.trim().toLowerCase(),
+          options: {
+            emailRedirectTo: `${window.location.origin}/app/dashboard`,
+            shouldCreateUser: false, // Solo deja entrar a usuarios ya registrados
+          },
+        });
 
-      if (error) {
-        // "shouldCreateUser: false" causa error si el email no existe en auth.users
-        if (error.message.includes("Signups not allowed")) {
-          setErrorMsg(
-            "Este correo no está registrado en FanFest AI. Postula tu negocio en la página principal para solicitar acceso."
-          );
-          setStep("error");
+        if (error) {
+          // "shouldCreateUser: false" causa error si el email no existe en auth.users
+          if (error.message.includes("Signups not allowed")) {
+            setErrorMsg(
+              "Este correo no está registrado en FanFest AI. Postula tu negocio en la página principal para solicitar acceso."
+            );
+            setStep("error");
+          } else {
+            throw error;
+          }
         } else {
-          throw error;
+          setStep("sent");
         }
       } else {
-        setStep("sent");
+        // Password login mode
+        const { error } = await supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password: password,
+        });
+
+        if (error) {
+          setErrorMsg("Correo o contraseña incorrectos. Por favor, verifica tus credenciales e intenta de nuevo.");
+          setStep("error");
+        } else {
+          // Redirige al dashboard privado de Next.js
+          window.location.href = "/app/dashboard";
+        }
       }
     } catch (err: any) {
       console.error("Login error:", err);
-      setErrorMsg(err.message ?? "Hubo un error al enviar el enlace. Intenta de nuevo.");
+      setErrorMsg(err.message ?? "Hubo un error al iniciar sesión. Intenta de nuevo.");
       setStep("error");
     } finally {
       setIsLoading(false);
@@ -79,7 +98,9 @@ export default function LoginPage() {
                   Accede a tu Dashboard
                 </h1>
                 <p className="text-sm text-zinc-400 leading-relaxed">
-                  Te enviaremos un enlace mágico a tu correo. Sin contraseña, sin complicaciones.
+                  {loginMode === "magic_link" 
+                    ? "Te enviaremos un enlace mágico a tu correo. Sin contraseña, sin complicaciones."
+                    : "Ingresa tu correo y contraseña registrados para acceder a tu panel."}
                 </p>
               </div>
 
@@ -107,6 +128,30 @@ export default function LoginPage() {
                   />
                 </div>
 
+                {loginMode === "password" && (
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="password"
+                      className="text-xs font-semibold text-zinc-400 uppercase tracking-wider"
+                    >
+                      Contraseña
+                    </label>
+                    <input
+                      id="password"
+                      type="password"
+                      required
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (step === "error") setStep("form");
+                      }}
+                      className="w-full bg-[#12131a] border border-zinc-800 rounded-lg px-4 py-3.5 text-white placeholder-zinc-600 focus:outline-none focus:border-[#c6ff00] focus:ring-1 focus:ring-[#c6ff00]/30 transition-all"
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                    />
+                  </div>
+                )}
+
                 {/* Error message */}
                 {step === "error" && errorMsg && (
                   <div className="bg-red-950/40 border border-red-500/30 rounded-lg p-3 text-sm text-red-300 flex gap-2.5">
@@ -116,23 +161,40 @@ export default function LoginPage() {
                 )}
 
                 <button
-                  id="send-magic-link-btn"
+                  id="submit-btn"
                   type="submit"
-                  disabled={isLoading || !email.trim()}
+                  disabled={isLoading || !email.trim() || (loginMode === "password" && !password)}
                   className="w-full bg-[#c6ff00] hover:bg-[#b3e600] disabled:opacity-50 disabled:cursor-not-allowed text-black font-extrabold py-3.5 rounded-lg transition-all hover:shadow-[0_0_30px_rgba(198,255,0,0.3)] active:scale-[0.98] flex items-center justify-center gap-2"
                 >
                   {isLoading ? (
                     <>
                       <span className="w-4 h-4 rounded-full border-2 border-black/30 border-t-black animate-spin" />
-                      Enviando enlace...
+                      {loginMode === "magic_link" ? "Enviando enlace..." : "Iniciando sesión..."}
                     </>
                   ) : (
                     <>
-                      ✉️ Enviar Enlace Mágico
+                      {loginMode === "magic_link" ? "✉️ Enviar Enlace Mágico" : "🔑 Iniciar Sesión"}
                     </>
                   )}
                 </button>
               </form>
+
+              {/* Login Mode Toggle */}
+              <div className="mt-5 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLoginMode(loginMode === "magic_link" ? "password" : "magic_link");
+                    setErrorMsg("");
+                    setStep("form");
+                  }}
+                  className="text-xs text-zinc-400 hover:text-[#c6ff00] transition-colors underline underline-offset-4"
+                >
+                  {loginMode === "magic_link"
+                    ? "¿Prefieres acceder con contraseña? Ingresa aquí"
+                    : "¿Prefieres acceder con Enlace Mágico? Enviar enlace"}
+                </button>
+              </div>
 
               <div className="mt-6 pt-6 border-t border-zinc-800 text-center">
                 <p className="text-xs text-zinc-500">
