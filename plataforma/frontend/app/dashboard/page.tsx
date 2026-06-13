@@ -213,15 +213,15 @@ export default function Home() {
   // Simulated copies based on settings (MOCK FALLBACKS — texto limpio)
   const copyOptions: Record<string, Record<string, string>> = {
     laureles: {
-      paisa: "¡GOLAZO del Verde, parce! ⚽🔥 Celebra el gol de Colombia en *El Templo de Laureles*. Por los próximos 30 minutos, toda la cerveza Águila está a 2x1. ¡Caigan pues antes de que se acabe! 🍻💚 #Colombia #Laureles #PaisaVibes",
+      paisa: "¡GOLAZO de Colombia, parce! ⚽🔥 Celebra el gol de la Tricolor en *El Templo de Laureles*. Por los próximos 30 minutos, toda la cerveza Águila está a 2x1. ¡Caigan pues antes de que se acabe! 🍻💛💙❤️ #Colombia #Laureles #PaisaVibes",
       premium: "¡Gol de Colombia! 🇨🇴✨ Vive la pasión del Mundial con nuestra promoción exclusiva: 2x1 en cócteles seleccionados por la próxima hora en nuestra terraza en Laureles. Reserva tu mesa ahora. 🍹⚽ #FanFestStyle #Laureles"
     },
     poblado: {
-      paisa: "¡Qué golazo de mi Verde, mor! 💚 Estalló el Mundial en El Poblado. Vente ya para *FanFest Lounge* y celebra con Heineken en balde a mitad de precio por los próximos 30 min. ¡Se prendió esto! 🍻🔥 #ElPoblado #PaisaStyle",
+      paisa: "¡Qué golazo de Colombia, mor! 🇨🇴 Estalló el Mundial en El Poblado. Vente ya para *FanFest Lounge* y celebra con Heineken en balde a mitad de precio por los próximos 30 min. ¡Se prendió esto! 🍻🔥 #ElPoblado #PaisaStyle",
       premium: "Goal by Colombia! ⚽🏆 Celebrate the World Cup at *FanFest Lounge Poblado*. Enjoy our premium draft beers with a 30% discount for the next hour. Premium vibe for real fans. 🍺🥂 #Poblado #SportsLounge"
     },
     envigado: {
-      paisa: "¡Goooool del Verde, muchachos! ⚽🔥 Envigado se viste de fiesta. Por cada gol de Colombia, la segunda picada va con 50% de descuento en *La Fonda del Gol*. ¡Vengan pues que el partido está de infarto! 🥩🍻 #Envigado #Mundial2026",
+      paisa: "¡Goooool de Colombia, muchachos! ⚽🔥 Envigado se viste de fiesta. Por cada gol de la Selección, la segunda picada va con 50% de descuento en *La Fonda del Gol*. ¡Vengan pues que el partido está de infarto! 🥩🍻 #Envigado #Mundial2026",
       premium: "Colombia abre el marcador. ⚽ Disfruta de una experiencia gastronómica premium en Envigado: te obsequiamos una entrada de autor por consumos superiores a $100K durante el resto del encuentro. 🍽️⚽ #EnvigadoGourmet"
     }
   };
@@ -353,7 +353,7 @@ export default function Home() {
 
   const handleApprove = async () => {
     if (activeCampaign?.id) {
-      const loadingId = addToast("loading", "🚀 Enviando aprobación de campaña...");
+      const loadingId = addToast("loading", "📲 Preparando copy para WhatsApp...");
       try {
         const { error } = await supabase
           .from("campaigns")
@@ -365,7 +365,7 @@ export default function Home() {
 
         if (error) throw error;
         removeToast(loadingId as unknown as number);
-        addToast("success", "✅ Campaña aprobada. Publicando en redes sociales...");
+        addToast("success", "✅ Copy listo. ¡Pégalo en tu WhatsApp y publica!");
         setCampaignApproved(true);
       } catch (error: any) {
         console.error("Error approving campaign in Supabase:", error);
@@ -379,7 +379,7 @@ export default function Home() {
 
 
   return (
-    <div className="min-h-screen bg-[#07080b] text-[#e2e8f0] font-sans antialiased selection:bg-[#c6ff00] selection:text-black">
+    <div className="min-h-screen bg-[#0D0D0D] text-[#e2e8f0] font-sans antialiased selection:bg-[#D4AF37] selection:text-black">
 
       {/* ── Toast Notifications ─────────────────────────────────────────────── */}
       <div className="fixed bottom-6 right-6 z-[100] flex flex-col gap-2 pointer-events-none">
@@ -395,7 +395,7 @@ export default function Home() {
             }`}
           >
             {toast.type === "loading" && (
-              <span className="w-3.5 h-3.5 rounded-full border-2 border-zinc-500 border-t-[#c6ff00] animate-spin shrink-0" />
+              <span className="w-3.5 h-3.5 rounded-full border-2 border-zinc-500 border-t-[#D4AF37] animate-spin shrink-0" />
             )}
             <span>{toast.message}</span>
           </div>
@@ -403,8 +403,8 @@ export default function Home() {
       </div>
 
       {/* Background gradients */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#c6ff00]/5 rounded-full blur-3xl pointer-events-none"></div>
-      <div className="absolute bottom-10 right-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#D4AF37]/5 rounded-full blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-10 right-1/4 w-96 h-96 bg-[#B87333]/5 rounded-full blur-3xl pointer-events-none"></div>
 
       {/* Navigation Header */}
       <header className="border-b border-zinc-800 bg-[#0c0d12]/80 backdrop-blur-md sticky top-0 z-50">
@@ -419,22 +419,24 @@ export default function Home() {
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="bg-[#c6ff00] text-black font-extrabold px-3 py-1 rounded-sm tracking-wider text-sm flex items-center gap-1.5 shadow-[0_0_15px_rgba(198,255,0,0.25)]">
-              <span className="w-2 h-2 rounded-full bg-black animate-pulse"></span>
-              FANFEST AI
-            </div>
+            <a href="/" className="flex items-center gap-1.5 group">
+              <div className="bg-[#D4AF37] text-black font-extrabold px-3 py-1 rounded-sm tracking-wider text-sm flex items-center gap-1.5 shadow-[0_0_15px_rgba(212,175,55,0.25)] group-hover:bg-[#c49d2a] transition-colors">
+                <span className="w-2 h-2 rounded-full bg-black animate-pulse"></span>
+                FANFEST AI
+              </div>
+            </a>
             <span className="text-xs text-zinc-500 hidden sm:inline">Demo Interactivo</span>
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-2 text-xs bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-full border border-emerald-500/20">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+            <div className="hidden sm:flex items-center gap-2 text-xs bg-[#D4AF37]/10 text-[#D4AF37] px-2.5 py-1 rounded-full border border-[#D4AF37]/20">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-ping"></span>
               Live Sports API Connected
             </div>
             <a
               href="/login"
               id="header-login-btn"
-              className="text-xs font-bold text-[#c6ff00] border border-[#c6ff00]/30 px-4 py-2 rounded-lg hover:bg-[#c6ff00]/10 transition-colors"
+              className="text-xs font-bold text-[#D4AF37] border border-[#D4AF37]/30 px-4 py-2 rounded-lg hover:bg-[#D4AF37]/10 transition-colors"
             >
               Acceder
             </a>
@@ -529,7 +531,7 @@ export default function Home() {
                     id="neighborhood-select"
                     value={selectedNeighborhood}
                     onChange={(e) => setSelectedNeighborhood(e.target.value)}
-                    className="bg-[#12131a] border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#c6ff00] transition-all cursor-pointer"
+                    className="bg-[#12131a] border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#D4AF37] transition-all cursor-pointer"
                   >
                     {businesses.length > 0 ? (
                       businesses.map((biz) => (
@@ -556,7 +558,7 @@ export default function Home() {
                       onClick={() => setSelectedTone("paisa")}
                       className={`text-xs py-2 px-3 rounded-lg border font-medium transition-all ${
                         selectedTone === "paisa"
-                          ? "bg-[#c6ff00]/10 border-[#c6ff00] text-[#c6ff00]"
+                          ? "bg-[#D4AF37]/10 border-[#D4AF37] text-[#D4AF37]"
                           : "bg-[#12131a] border-zinc-800 text-zinc-400 hover:border-zinc-700"
                       }`}
                     >
@@ -567,7 +569,7 @@ export default function Home() {
                       onClick={() => setSelectedTone("premium")}
                       className={`text-xs py-2 px-3 rounded-lg border font-medium transition-all ${
                         selectedTone === "premium"
-                          ? "bg-[#c6ff00]/10 border-[#c6ff00] text-[#c6ff00]"
+                          ? "bg-[#D4AF37]/10 border-[#D4AF37] text-[#D4AF37]"
                           : "bg-[#12131a] border-zinc-800 text-zinc-400 hover:border-zinc-700"
                       }`}
                     >
@@ -579,9 +581,9 @@ export default function Home() {
                 {/* Status Indicators */}
                 <div className="mt-2 pt-4 border-t border-zinc-800 flex flex-col gap-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-500">Instagram Business</span>
-                    <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Vinculado
+                    <span className="text-zinc-500">WhatsApp Business</span>
+                    <span className="text-[#D4AF37] font-semibold flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]"></span> Activo
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
@@ -604,7 +606,7 @@ export default function Home() {
               <div className="bg-[#12131a] px-6 py-4 border-b border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs bg-[#c6ff00]/10 text-[#c6ff00] px-2 py-0.5 rounded font-mono font-semibold">
+                    <span className="text-xs bg-[#D4AF37]/10 text-[#D4AF37] px-2 py-0.5 rounded font-mono font-semibold">
                       {activeCampaign
                         ? `CAMP-${activeCampaign.id.slice(0, 8).toUpperCase()}`
                         : "CAMP-MOCK-042"}
@@ -672,25 +674,25 @@ export default function Home() {
 
                 {/* Image Preview mockup */}
                 <div className="md:col-span-5">
-                  <span className="text-xs text-zinc-500 uppercase tracking-wider font-bold block mb-2">Visual del Post (Instagram Feed)</span>
+                  <span className="text-xs text-zinc-500 uppercase tracking-wider font-bold block mb-2">Visual del Post (Para Redes Sociales)</span>
                   
-                  <div className="relative aspect-square w-full rounded-lg overflow-hidden border border-zinc-700 bg-gradient-to-br from-emerald-900 via-zinc-950 to-black flex flex-col justify-between p-5 shadow-2xl">
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(198,255,0,0.1),transparent)] pointer-events-none"></div>
+                  <div className="relative aspect-square w-full rounded-lg overflow-hidden border border-zinc-700 bg-gradient-to-br from-[#1a1200] via-zinc-950 to-black flex flex-col justify-between p-5 shadow-2xl">
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(212,175,55,0.12),transparent)] pointer-events-none"></div>
                     
                     {/* Poster Top */}
                     <div className="flex justify-between items-start z-10">
-                      <div className="bg-black/60 backdrop-blur-md border border-zinc-800 px-2 py-1 rounded text-[9px] font-bold tracking-widest text-[#c6ff00] uppercase flex items-center gap-1.5">
+                      <div className="bg-black/60 backdrop-blur-md border border-zinc-800 px-2 py-1 rounded text-[9px] font-bold tracking-widest text-[#D4AF37] uppercase flex items-center gap-1.5">
                         <img src="https://flagcdn.com/w20/co.png" alt="🇨🇴" className="w-4 h-3 object-cover rounded-sm" />
                         COLOMBIA
                       </div>
-                      <div className="bg-[#c6ff00] text-black text-[9px] font-black px-2 py-0.5 rounded shadow">
-                        GOL DE LOCAL
+                      <div className="bg-[#D4AF37] text-black text-[9px] font-black px-2 py-0.5 rounded shadow">
+                        GOL DE COLOMBIA
                       </div>
                     </div>
 
                     {/* Poster Center */}
                     <div className="text-center my-auto z-10">
-                      <h4 className="text-[#c6ff00] font-black text-4xl italic tracking-tighter uppercase drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
+                      <h4 className="text-[#D4AF37] font-black text-4xl italic tracking-tighter uppercase drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
                         ¡2X1 HOY!
                       </h4>
                       <p className="text-white text-xs font-semibold tracking-wide uppercase drop-shadow mt-1">
@@ -704,7 +706,7 @@ export default function Home() {
                     {/* Poster Bottom */}
                     <div className="flex justify-between items-end border-t border-white/10 pt-2 z-10">
                       <span className="text-[10px] font-bold text-white tracking-tight">El Templo Bar</span>
-                      <span className="text-[9px] text-[#c6ff00] font-mono">Medellín • Mundial 2026</span>
+                      <span className="text-[9px] text-[#D4AF37] font-mono">Medellín • Mundial 2026</span>
                     </div>
                   </div>
                 </div>
@@ -728,7 +730,7 @@ export default function Home() {
                   >
                     {isRegenerating ? (
                       <>
-                        <span className="w-3 h-3 rounded-full border-2 border-zinc-500 border-t-[#c6ff00] animate-spin" />
+                        <span className="w-3 h-3 rounded-full border-2 border-zinc-500 border-t-[#D4AF37] animate-spin" />
                         Generando...
                       </>
                     ) : (
@@ -740,34 +742,34 @@ export default function Home() {
                 <div>
                   {activeCampaign ? (
                     activeCampaign.status === "published" ? (
-                      <div className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2">
-                        ✅ ¡Publicado Exitosamente en Instagram!
+                      <div className="bg-emerald-950/60 text-emerald-400 border border-emerald-500/30 px-5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2">
+                        ✅ ¡Copy Enviado a WhatsApp!
                       </div>
                     ) : activeCampaign.status === "approved" ? (
-                      <div className="bg-amber-500/10 text-amber-400 border border-amber-500/30 px-5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2">
-                        <span className="w-3.5 h-3.5 rounded-full border-2 border-amber-400 border-t-transparent animate-spin mr-1" />
-                        ⏳ Publicando en Instagram...
+                      <div className="bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/30 px-5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2">
+                        <span className="w-3.5 h-3.5 rounded-full border-2 border-[#D4AF37] border-t-transparent animate-spin mr-1" />
+                        ⏳ Enviando a WhatsApp...
                       </div>
                     ) : (
                       <button
                         id="approve-publish-btn"
                         onClick={handleApprove}
-                        className="bg-[#c6ff00] hover:bg-[#b0e000] text-black text-xs font-extrabold py-2.5 px-6 rounded-lg transition-all shadow-[0_4px_20px_rgba(198,255,0,0.35)] active:scale-[0.98] hover:shadow-[0_4px_25px_rgba(198,255,0,0.5)]"
+                        className="bg-[#D4AF37] hover:bg-[#c49d2a] text-black text-xs font-extrabold py-2.5 px-6 rounded-lg transition-all shadow-[0_4px_20px_rgba(212,175,55,0.35)] active:scale-[0.98] hover:shadow-[0_4px_25px_rgba(212,175,55,0.5)]"
                       >
-                        🚀 Aprobar y Publicar en Instagram
+                        📲 Copiar y Enviar por WhatsApp
                       </button>
                     )
                   ) : campaignApproved ? (
-                    <div className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2">
-                      ✅ ¡Publicado Exitosamente en Instagram!
+                    <div className="bg-emerald-950/60 text-emerald-400 border border-emerald-500/30 px-5 py-2.5 rounded-lg text-xs font-bold flex items-center gap-2">
+                      ✅ ¡Copy Enviado a WhatsApp!
                     </div>
                   ) : (
                     <button
                       id="approve-publish-btn"
                       onClick={handleApprove}
-                      className="bg-[#c6ff00] hover:bg-[#b0e000] text-black text-xs font-extrabold py-2.5 px-6 rounded-lg transition-all shadow-[0_4px_20px_rgba(198,255,0,0.35)] active:scale-[0.98] hover:shadow-[0_4px_25px_rgba(198,255,0,0.5)]"
+                      className="bg-[#D4AF37] hover:bg-[#c49d2a] text-black text-xs font-extrabold py-2.5 px-6 rounded-lg transition-all shadow-[0_4px_20px_rgba(212,175,55,0.35)] active:scale-[0.98] hover:shadow-[0_4px_25px_rgba(212,175,55,0.5)]"
                     >
-                      🚀 Aprobar y Publicar en Instagram
+                      📲 Copiar y Enviar por WhatsApp
                     </button>
                   )}
                 </div>
@@ -779,7 +781,7 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               
               <div className="bg-[#0c0d12] border border-zinc-800 rounded-xl p-5 shadow-xl flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg bg-[#c6ff00]/10 flex items-center justify-center text-lg text-[#c6ff00]">
+                <div className="w-10 h-10 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center text-lg text-[#D4AF37]">
                   📈
                 </div>
                 <div>
@@ -789,7 +791,7 @@ export default function Home() {
               </div>
 
               <div className="bg-[#0c0d12] border border-zinc-800 rounded-xl p-5 shadow-xl flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg bg-[#c6ff00]/10 flex items-center justify-center text-lg text-[#c6ff00]">
+                <div className="w-10 h-10 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center text-lg text-[#D4AF37]">
                   ⚡
                 </div>
                 <div>
@@ -799,7 +801,7 @@ export default function Home() {
               </div>
 
               <div className="bg-[#0c0d12] border border-zinc-800 rounded-xl p-5 shadow-xl flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg bg-[#c6ff00]/10 flex items-center justify-center text-lg text-[#c6ff00]">
+                <div className="w-10 h-10 rounded-lg bg-[#D4AF37]/10 flex items-center justify-center text-lg text-[#D4AF37]">
                   🔥
                 </div>
                 <div>
@@ -823,7 +825,7 @@ export default function Home() {
               </h2>
               <p className="text-xs text-zinc-400 mt-1">Estado de onboarding y follow-up de negocios beta.</p>
             </div>
-            <div className="text-xs bg-[#c6ff00]/10 text-[#c6ff00] px-3 py-1 rounded-full font-bold border border-[#c6ff00]/20">
+            <div className="text-xs bg-[#D4AF37]/10 text-[#D4AF37] px-3 py-1 rounded-full font-bold border border-[#D4AF37]/20">
               {crmData.length} Negocios Registrados
             </div>
           </div>
@@ -855,7 +857,7 @@ export default function Home() {
                       <td className="p-4">
                         <span className={`px-2 py-1 rounded text-xs font-bold ${
                           row.crm_status === 'contacted' ? 'bg-amber-500/10 text-amber-500' :
-                          row.crm_status === 'pilot_active' ? 'bg-[#c6ff00]/10 text-[#c6ff00]' :
+                          row.crm_status === 'pilot_active' ? 'bg-[#D4AF37]/10 text-[#D4AF37]' :
                           'bg-zinc-800 text-zinc-400'
                         }`}>
                           {row.crm_status}
