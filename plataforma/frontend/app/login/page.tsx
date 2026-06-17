@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { supabase } from "../lib/supabaseClient";
 
 type LoginStep = "form" | "sent" | "error";
@@ -59,9 +60,9 @@ export default function LoginPage() {
           window.location.href = "/app/dashboard";
         }
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Login error:", err);
-      setErrorMsg(err.message ?? "Hubo un error al iniciar sesión. Intenta de nuevo.");
+      setErrorMsg(err instanceof Error ? err.message : "Hubo un error al iniciar sesión. Intenta de nuevo.");
       setStep("error");
     } finally {
       setIsLoading(false);
@@ -79,10 +80,10 @@ export default function LoginPage() {
         
         {/* Logo */}
         <div className="text-center mb-10">
-          <a href="/" className="inline-flex items-center gap-2 text-white font-black tracking-tighter text-2xl hover:opacity-80 transition-opacity">
+          <Link href="/" className="inline-flex items-center gap-2 text-white font-black tracking-tighter text-2xl hover:opacity-80 transition-opacity">
             <span className="w-3 h-3 bg-[#c6ff00] rounded-sm" />
             FANFEST<span className="text-zinc-500">AI</span>
-          </a>
+          </Link>
           <p className="text-zinc-500 text-sm mt-2">Panel de Gestión de Negocios</p>
         </div>
 
@@ -199,12 +200,12 @@ export default function LoginPage() {
               <div className="mt-6 pt-6 border-t border-zinc-800 text-center">
                 <p className="text-xs text-zinc-500">
                   ¿Aún no tienes acceso?{" "}
-                  <a
+                  <Link
                     href="/#beta-form"
                     className="text-[#c6ff00] font-semibold hover:underline"
                   >
                     Postula tu negocio
-                  </a>
+                  </Link>
                 </p>
               </div>
             </div>

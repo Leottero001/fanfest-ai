@@ -1,5 +1,20 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "../../lib/supabaseServer";
+
+type CrmRow = {
+  business_id: string;
+  business_name: string;
+  owner_name: string;
+  whatsapp: string;
+  neighborhood: string;
+  business_type: string;
+  crm_status: string;
+  welcome_sent: boolean;
+  pre_match_contents_sent: number;
+  confirmed_publications: number;
+  followups_sent: number;
+};
 
 export default async function AdminPage() {
   const supabase = await createSupabaseServerClient();
@@ -29,7 +44,7 @@ export default async function AdminPage() {
     .select("*")
     .order("registered_at", { ascending: false });
     
-  const crmData = crmDataFetch || [];
+  const crmData: CrmRow[] = (crmDataFetch as CrmRow[] | null) ?? [];
 
   return (
     <div className="min-h-screen bg-[#07080b] text-[#e2e8f0] font-sans antialiased p-8">
@@ -45,9 +60,9 @@ export default async function AdminPage() {
             </h1>
             <p className="text-zinc-400 mt-2">Área restringida exclusiva para equipo interno de FanFest AI.</p>
           </div>
-          <a href="/app/dashboard" className="text-sm bg-zinc-800 hover:bg-zinc-700 px-5 py-2.5 rounded-lg border border-zinc-700 font-semibold transition-colors">
+          <Link href="/app/dashboard" className="text-sm bg-zinc-800 hover:bg-zinc-700 px-5 py-2.5 rounded-lg border border-zinc-700 font-semibold transition-colors">
             ← Volver al Dashboard
-          </a>
+          </Link>
         </header>
 
         <div className="bg-[#0c0d12] border border-zinc-800 rounded-xl p-8 shadow-xl mb-8">
@@ -106,7 +121,7 @@ export default async function AdminPage() {
               </thead>
               <tbody className="text-sm">
                 {crmData.length > 0 ? (
-                  crmData.map((row: any) => (
+                  crmData.map((row) => (
                     <tr key={row.business_id} className="border-b border-zinc-800/50 hover:bg-[#12131a]/50 transition-colors">
                       <td className="p-4">
                         <div className="font-bold text-white">{row.business_name}</div>

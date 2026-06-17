@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { supabase as rawSupabase } from "../lib/supabaseClient";
-const supabase = rawSupabase as any;
+import Link from "next/link";
+import { supabase } from "../lib/supabaseClient";
 import type { Business, SportsEvent, Campaign, AiGeneration } from "../lib/database.types";
+
 
 // ── Edge Function URL helper ──────────────────────────────────────────────────
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -14,31 +15,20 @@ const EDGE_FN_URL = `${SUPABASE_URL}/functions/v1/generate-campaign-copy`;
 type Toast = { id: number; type: "success" | "error" | "loading"; message: string };
 
 export default function Home() {
-  const [selectedNeighborhood, setSelectedNeighborhood] = useState("laureles");
-  const [selectedTone, setSelectedTone] = useState("paisa");
+  const getInitialParam = (key: string, fallback: string) => {
+    if (typeof window === "undefined") return fallback;
+    const value = new URLSearchParams(window.location.search).get(key);
+    return value ? value.toLowerCase() : fallback;
+  };
 
-  // Detect query parameters on mount to support deep linking from /app/dashboard
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      const urlNeighborhood = params.get("neighborhood");
-      const urlTone = params.get("tone");
-      
-      if (urlNeighborhood) {
-        setSelectedNeighborhood(urlNeighborhood.toLowerCase());
-      }
-      if (urlTone) {
-        setSelectedTone(urlTone.toLowerCase());
-      }
-    }
-  }, []);
-  
+  const [selectedNeighborhood, setSelectedNeighborhood] = useState(() => getInitialParam("neighborhood", "laureles"));
+  const [selectedTone, setSelectedTone] = useState(() => getInitialParam("tone", "paisa"));
+
   // Database States
   const [businesses, setBusinesses] = useState<Business[]>([]);
   const [activeEvent, setActiveEvent] = useState<SportsEvent | null>(null);
   const [activeCampaign, setActiveCampaign] = useState<Campaign | null>(null);
   const [aiGenerations, setAiGenerations] = useState<AiGeneration[]>([]);
-  const [crmData, setCrmData] = useState<any[]>([]);
   
   // UI States (with mock fallbacks)
   const [scoreColombia, setscoreColombia] = useState(1);
@@ -49,7 +39,6 @@ export default function Home() {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [liveGeneratedText, setLiveGeneratedText] = useState<string | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const [toastCounter, setToastCounter] = useState(0);
 
   // 1. Initial Load: Fetch businesses and the active/latest sports event
   useEffect(() => {
@@ -70,14 +59,6 @@ export default function Home() {
           .limit(1);
 
         if (eventError) throw eventError;
-
-        const { data: crmFetch, error: crmError } = await supabase
-          .from("v_pilot_crm_dashboard")
-          .select("*")
-          .order("registered_at", { ascending: false });
-
-        if (!crmError && crmFetch) setCrmData(crmFetch);
-        
         if (eventData && eventData.length > 0) {
           const mainEvent = eventData[0] as SportsEvent;
           setActiveEvent(mainEvent);
@@ -107,8 +88,8 @@ export default function Home() {
           table: "sports_events",
           filter: `id=eq.${activeEvent.id}`,
         },
-        (payload: any) => {
-          const updatedEvent = payload.new as SportsEvent;
+        (payload: { new: SportsEvent }) => {
+          const updatedEvent = payload.new;
           setActiveEvent(updatedEvent);
           setscoreColombia(updatedEvent.home_score);
           setscoreBrasil(updatedEvent.away_score);
@@ -136,8 +117,8 @@ export default function Home() {
           table: "campaigns",
           filter: `id=eq.${activeCampaign.id}`,
         },
-        (payload: any) => {
-          const updatedCampaign = payload.new as Campaign;
+        (payload: { new: Campaign }) => {
+          const updatedCampaign = payload.new;
           setActiveCampaign(updatedCampaign);
           setCampaignApproved(updatedCampaign.status === "published" || updatedCampaign.status === "approved");
         }
@@ -257,7 +238,7 @@ export default function Home() {
             home_score: nextScore,
             match_minute: nextMinute,
             status: "live",
-          } as any)
+          } as Partial<SportsEvent>)
           .eq("id", activeEvent.id);
 
         if (error) throw error;
@@ -306,7 +287,7 @@ export default function Home() {
           away_team: activeEvent?.away_team ?? "Brasil",
           score: `${scoreColombia}-${scoreBrasil}`,
           minute: matchMinute,
-          scorer: (activeEvent as any)?.event_metadata?.goals?.slice(-1)[0]?.player ?? "Luis Díaz",
+          scorer: ((activeEvent?.event_metadata as { goals?: Array<{ player?: string }> })?.goals?.slice(-1)[0]?.player) ?? "Luis Díaz",
           discount: "2x1 en cerveza Águila",
           duration_minutes: 30,
         },
@@ -342,10 +323,10 @@ export default function Home() {
 
       removeToast(loadingId as unknown as number);
       addToast("success", `✅ Copy generado con ${data.model} (${data.tokens?.total ?? "?"} tokens)`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Regenerate error:", err);
-      removeToast(loadingId as unknown as number);
-      addToast("error", `❌ ${err.message ?? "Error al generar copy"}`);
+      removeToast(loadingId);
+      addToast("error", `❌ ${err instanceof Error ? err.message : "Error al generar copy"}`);
     } finally {
       setIsRegenerating(false);
     }
@@ -360,17 +341,17 @@ export default function Home() {
           .update({
             status: "approved",
             approved_at: new Date().toISOString(),
-          } as any)
+          } as Partial<Campaign>)
           .eq("id", activeCampaign.id);
 
         if (error) throw error;
         removeToast(loadingId as unknown as number);
         addToast("success", "✅ Copy listo. ¡Pégalo en tu WhatsApp y publica!");
         setCampaignApproved(true);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error("Error approving campaign in Supabase:", error);
-        removeToast(loadingId as unknown as number);
-        addToast("error", `❌ Error al aprobar campaña: ${error.message || "Error desconocido"}`);
+        removeToast(loadingId);
+        addToast("error", `❌ Error al aprobar campaña: ${error instanceof Error ? error.message : "Error desconocido"}`);
       }
     } else {
       setCampaignApproved(true);
@@ -412,19 +393,19 @@ export default function Home() {
         <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-1.5 text-center">
           <p className="text-[11px] text-amber-400 font-medium">
             👁️ Modo Demo — Estás viendo datos de ejemplo.{" "}
-            <a href="/login" className="underline font-bold hover:text-amber-300 transition-colors">
+            <Link href="/login" className="underline font-bold hover:text-amber-300 transition-colors">
               Accede a tu panel real →
-            </a>
+            </Link>
           </p>
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <a href="/" className="flex items-center gap-1.5 group">
+            <Link href="/" className="flex items-center gap-1.5 group">
               <div className="bg-[#D4AF37] text-black font-extrabold px-3 py-1 rounded-sm tracking-wider text-sm flex items-center gap-1.5 shadow-[0_0_15px_rgba(212,175,55,0.25)] group-hover:bg-[#c49d2a] transition-colors">
                 <span className="w-2 h-2 rounded-full bg-black animate-pulse"></span>
                 FANFEST AI
               </div>
-            </a>
+            </Link>
             <span className="text-xs text-zinc-500 hidden sm:inline">Demo Interactivo</span>
           </div>
 
@@ -433,13 +414,13 @@ export default function Home() {
               <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37] animate-ping"></span>
               Live Sports API Connected
             </div>
-            <a
+            <Link
               href="/login"
               id="header-login-btn"
               className="text-xs font-bold text-[#D4AF37] border border-[#D4AF37]/30 px-4 py-2 rounded-lg hover:bg-[#D4AF37]/10 transition-colors"
             >
               Acceder
-            </a>
+            </Link>
           </div>
         </div>
       </header>

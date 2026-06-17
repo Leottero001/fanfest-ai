@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Link from "next/link";
 import { supabase } from "./lib/supabaseClient";
 
 // ── Brand tokens ──────────────────────────────────────────────────────────────
@@ -95,7 +96,7 @@ export default function LandingPage() {
         preferred_hashtags: formData.preferred_hashtags.split(',').map(s => s.trim()).filter(Boolean)
       };
 
-      const { error } = await (supabase.from('beta_businesses') as any).insert([
+      const { error } = await supabase.from('beta_businesses').insert([
         submissionData,
       ]);
 
@@ -121,9 +122,9 @@ export default function LandingPage() {
           <p className="text-zinc-400 mb-6">
             Gracias por tu interés, {formData.owner_name}. Hemos registrado a {formData.business_name} en nuestra lista prioritaria para el Mundial 2026. Te contactaremos pronto por WhatsApp.
           </p>
-          <a href="/dashboard" className="inline-block bg-[#D4AF37] text-black font-bold py-3 px-8 rounded-lg hover:scale-105 transition-transform">
+          <Link href="/dashboard" className="inline-block bg-[#D4AF37] text-black font-bold py-3 px-8 rounded-lg hover:scale-105 transition-transform">
             Ver Demo Interactiva
-          </a>
+          </Link>
         </div>
       </div>
     );
@@ -147,9 +148,9 @@ export default function LandingPage() {
           FANFEST<span className="text-zinc-500">AI</span>
         </div>
         <div className="flex items-center gap-3">
-          <a href="/login" className="text-xs font-semibold text-zinc-400 hover:text-white transition-colors px-3 py-2">
+          <Link href="/login" className="text-xs font-semibold text-zinc-400 hover:text-white transition-colors px-3 py-2">
             Acceder →
-          </a>
+          </Link>
           <a href="#beta-form" className="text-xs font-bold text-[#D4AF37] border border-[#D4AF37]/30 px-4 py-2 rounded-full hover:bg-[#D4AF37]/10 transition-colors">
             Acceso Beta
           </a>
@@ -180,9 +181,9 @@ export default function LandingPage() {
               <a href="#beta-form" className="bg-[#D4AF37] text-black font-extrabold text-lg px-8 py-4 rounded-xl shadow-[0_0_30px_rgba(212,175,55,0.25)] hover:shadow-[0_0_40px_rgba(212,175,55,0.45)] hover:-translate-y-1 transition-all text-center">
                 Únete a la Beta Privada
               </a>
-              <a href="/dashboard" className="bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-lg px-8 py-4 rounded-xl transition-all flex items-center justify-center gap-2">
+              <Link href="/dashboard" className="bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-lg px-8 py-4 rounded-xl transition-all flex items-center justify-center gap-2">
                 Ver Demo <span>→</span>
-              </a>
+              </Link>
             </div>
             
             <div className="mt-10 flex items-center gap-6 text-sm font-medium text-zinc-500">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { supabase } from "../../lib/supabaseClient";
 import { useRouter } from "next/navigation";
 
@@ -33,7 +34,7 @@ export default function AppDashboardClient({ user, businesses }: Props) {
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
-    await (supabase as any).auth.signOut();
+    await supabase.auth.signOut();
     router.push("/login");
   };
 
@@ -60,9 +61,9 @@ export default function AppDashboardClient({ user, businesses }: Props) {
             
             {/* Paso 3: Renderizado condicional en UI */}
             {user.isAdmin && (
-              <a href="/app/admin" className="ml-2 bg-zinc-800 text-[#c6ff00] border border-[#c6ff00]/30 hover:bg-zinc-700 text-xs font-bold px-3 py-1 rounded-md transition-colors flex items-center gap-1.5">
+              <Link href="/app/admin" className="ml-2 bg-zinc-800 text-[#c6ff00] border border-[#c6ff00]/30 hover:bg-zinc-700 text-xs font-bold px-3 py-1 rounded-md transition-colors flex items-center gap-1.5">
                 <span>👑</span> Admin
-              </a>
+              </Link>
             )}
           </div>
 
