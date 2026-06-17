@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { supabase } from "../lib/supabaseClient";
-import type { Business, SportsEvent, Campaign, AiGeneration } from "../lib/database.types";
 import type { Business, SportsEvent, Campaign, AiGeneration, CampaignUpdate } from "../lib/database.types";
 
 // ── Edge Function URL helper ──────────────────────────────────────────────────
