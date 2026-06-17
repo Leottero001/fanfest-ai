@@ -28,11 +28,15 @@ export default async function AdminPage() {
   }
 
   // Verificación is_admin a nivel Servidor (Paso 2)
-  const { data: profile } = await supabase
+  // Cast explícito necesario porque Supabase JS infiere el tipo como 'never'
+  // cuando la vista/tabla no está completamente tipada en el Database schema.
+  const { data: profileRaw } = await supabase
     .from("profiles")
     .select("is_admin")
     .eq("id", user.id)
     .single();
+
+  const profile = profileRaw as { is_admin: boolean | null } | null;
 
   if (!profile?.is_admin) {
     redirect("/app/dashboard");

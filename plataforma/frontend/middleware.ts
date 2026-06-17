@@ -59,11 +59,13 @@ export async function middleware(request: NextRequest) {
 
   // Protect /app/admin/* routes - verify if user is admin
   if (pathname.startsWith('/app/admin') && user) {
-    const { data: profile } = await supabase
+    const { data: profileRaw } = await supabase
       .from('profiles')
       .select('is_admin')
       .eq('id', user.id)
       .single();
+
+    const profile = profileRaw as { is_admin: boolean | null } | null;
 
     if (!profile?.is_admin) {
       const dashboardUrl = request.nextUrl.clone();
