@@ -233,12 +233,12 @@ export default function Home() {
     if (activeEvent?.id) {
       try {
         const { error } = await supabase
-          .from("sports_events")
+          .from("sports_events" as any)
           .update({
             home_score: nextScore,
             match_minute: nextMinute,
             status: "live",
-          } as any)
+          })
           .eq("id", activeEvent.id);
 
         if (error) throw error;
