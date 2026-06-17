@@ -232,8 +232,10 @@ export default function Home() {
 
     if (activeEvent?.id) {
       try {
-        const { error } = await supabase
-          .from("sports_events" as any)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const client = supabase as any;
+        const { error } = await client
+          .from("sports_events")
           .update({
             home_score: nextScore,
             match_minute: nextMinute,
@@ -247,9 +249,6 @@ export default function Home() {
         setscoreColombia(nextScore);
         setMatchMinute(nextMinute);
       }
-    } else {
-      setscoreColombia(nextScore);
-      setMatchMinute(nextMinute);
     }
 
     setLiveGeneratedText(null);
