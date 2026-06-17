@@ -311,8 +311,8 @@ export default function Home() {
       setCampaignApproved(false);
 
       if (data.campaign_id && (!activeCampaign || activeCampaign.id !== data.campaign_id)) {
-        const { data: newCamp } = await supabase
-          .from("campaigns" as any)
+        const { data: newCamp } = await (supabase as any)
+          .from("campaigns")
           .select("*")
           .eq("id", data.campaign_id)
           .single();
@@ -334,8 +334,8 @@ export default function Home() {
     if (activeCampaign?.id) {
       const loadingId = addToast("loading", "📲 Preparando copy para WhatsApp...");
       try {
-        const { error } = await supabase
-          .from("campaigns" as any)
+        const { error } = await (supabase as any)
+          .from("campaigns")
           .update({
             status: "approved",
             approved_at: new Date().toISOString(),
