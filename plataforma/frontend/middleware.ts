@@ -57,6 +57,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(appUrl);
   }
 
+  // Protect /app/admin/* routes - verify if user is admin
+  if (pathname.startsWith('/app/admin') && user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile?.is_admin) {
+      const dashboardUrl = request.nextUrl.clone();
+      dashboardUrl.pathname = '/app/dashboard';
+      return NextResponse.redirect(dashboardUrl);
+    }
+  }
+
   return supabaseResponse;
 }
 

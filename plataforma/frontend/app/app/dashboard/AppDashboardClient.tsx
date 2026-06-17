@@ -9,6 +9,7 @@ interface UserData {
   email: string;
   fullName: string;
   avatarUrl: string | null;
+  isAdmin: boolean;
 }
 
 interface BusinessData {
@@ -56,6 +57,13 @@ export default function AppDashboardClient({ user, businesses }: Props) {
               FANFEST AI
             </div>
             <span className="text-xs text-zinc-500 hidden sm:inline">Mi Panel</span>
+            
+            {/* Paso 3: Renderizado condicional en UI */}
+            {user.isAdmin && (
+              <a href="/app/admin" className="ml-2 bg-zinc-800 text-[#c6ff00] border border-[#c6ff00]/30 hover:bg-zinc-700 text-xs font-bold px-3 py-1 rounded-md transition-colors flex items-center gap-1.5">
+                <span>👑</span> Admin
+              </a>
+            )}
           </div>
 
           <div className="flex items-center gap-3">

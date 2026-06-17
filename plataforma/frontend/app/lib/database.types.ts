@@ -72,6 +72,7 @@ export interface Profile {
   full_name: string | null;
   avatar_url: string | null;
   phone: string | null;
+  is_admin: boolean | null;
   created_at: string;
   updated_at: string;
 }

@@ -578,19 +578,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* Status Indicators */}
-                <div className="mt-2 pt-4 border-t border-zinc-800 flex flex-col gap-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-500">WhatsApp Business</span>
-                    <span className="text-[#D4AF37] font-semibold flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]"></span> Activo
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-zinc-500">Límite de API (Gemini Free)</span>
-                    <span className="text-zinc-300 font-medium">9/1,500 reqs/día</span>
-                  </div>
-                </div>
+
               </div>
             </div>
 

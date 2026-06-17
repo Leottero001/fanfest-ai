@@ -22,11 +22,11 @@ export default async function AppDashboardPage() {
   // Fetch profile data
   const { data: profileData } = await supabase
     .from("profiles")
-    .select("full_name, avatar_url, phone")
+    .select("full_name, avatar_url, phone, is_admin")
     .eq("id", user.id)
     .single();
 
-  const profile = profileData as { full_name: string | null; avatar_url: string | null; phone: string | null } | null;
+  const profile = profileData as { full_name: string | null; avatar_url: string | null; phone: string | null; is_admin: boolean | null } | null;
 
   // Fetch businesses for this user via business_members
   const { data: memberships } = await supabase
@@ -45,6 +45,7 @@ export default async function AppDashboardPage() {
         email: user.email ?? "",
         fullName: profile?.full_name ?? "",
         avatarUrl: profile?.avatar_url ?? null,
+        isAdmin: profile?.is_admin ?? false,
       }}
       businesses={businesses}
     />
