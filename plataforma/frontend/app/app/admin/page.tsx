@@ -23,6 +23,14 @@ export default async function AdminPage() {
     redirect("/app/dashboard");
   }
 
+  // Fetch CRM Data
+  const { data: crmDataFetch } = await supabase
+    .from("v_pilot_crm_dashboard")
+    .select("*")
+    .order("registered_at", { ascending: false });
+    
+  const crmData = crmDataFetch || [];
+
   return (
     <div className="min-h-screen bg-[#07080b] text-[#e2e8f0] font-sans antialiased p-8">
       {/* Background glows */}
@@ -69,6 +77,87 @@ export default async function AdminPage() {
             </div>
           </div>
         </div>
+
+        {/* CRM Dashboard Section (MVP Pilot) Movido al Admin */}
+        <div className="mt-8 bg-[#0c0d12] border border-zinc-800 rounded-xl overflow-hidden shadow-xl">
+          <div className="bg-[#12131a] px-6 py-4 border-b border-zinc-800 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                📋 CRM Piloto Medellín (WhatsApp)
+              </h2>
+              <p className="text-xs text-zinc-400 mt-1">Estado de onboarding y follow-up de negocios beta.</p>
+            </div>
+            <div className="text-xs bg-[#c6ff00]/10 text-[#c6ff00] px-3 py-1 rounded-full font-bold border border-[#c6ff00]/20">
+              {crmData.length} Negocios Registrados
+            </div>
+          </div>
+          
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-[#161720] text-zinc-400 text-xs uppercase tracking-wider font-semibold">
+                  <th className="p-4 border-b border-zinc-800">Negocio</th>
+                  <th className="p-4 border-b border-zinc-800">Sede</th>
+                  <th className="p-4 border-b border-zinc-800">Status CRM</th>
+                  <th className="p-4 border-b border-zinc-800">Bienvenida WA</th>
+                  <th className="p-4 border-b border-zinc-800">Contenido Enviado</th>
+                  <th className="p-4 border-b border-zinc-800">Follow-up Resp.</th>
+                </tr>
+              </thead>
+              <tbody className="text-sm">
+                {crmData.length > 0 ? (
+                  crmData.map((row: any) => (
+                    <tr key={row.business_id} className="border-b border-zinc-800/50 hover:bg-[#12131a]/50 transition-colors">
+                      <td className="p-4">
+                        <div className="font-bold text-white">{row.business_name}</div>
+                        <div className="text-xs text-zinc-500">{row.owner_name} • {row.whatsapp}</div>
+                      </td>
+                      <td className="p-4">
+                        <span className="capitalize">{row.neighborhood}</span>
+                        <div className="text-xs text-zinc-500 capitalize">{row.business_type}</div>
+                      </td>
+                      <td className="p-4">
+                        <span className={`px-2 py-1 rounded text-xs font-bold ${
+                          row.crm_status === 'contacted' ? 'bg-amber-500/10 text-amber-500' :
+                          row.crm_status === 'pilot_active' ? 'bg-[#c6ff00]/10 text-[#c6ff00]' :
+                          'bg-zinc-800 text-zinc-400'
+                        }`}>
+                          {row.crm_status}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        {row.welcome_sent ? (
+                          <span className="text-emerald-400 font-bold flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Sí</span>
+                        ) : (
+                          <span className="text-zinc-500">Pendiente</span>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <div className="font-mono text-zinc-300">{row.pre_match_contents_sent} Partidos</div>
+                      </td>
+                      <td className="p-4">
+                        {row.confirmed_publications > 0 ? (
+                          <span className="text-emerald-400 font-bold flex items-center gap-1.5">✅ Publicó ({row.confirmed_publications})</span>
+                        ) : row.followups_sent > 0 ? (
+                          <span className="text-amber-500">Esperando resp.</span>
+                        ) : (
+                          <span className="text-zinc-500">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="p-8 text-center text-zinc-500 text-sm">
+                      Aún no hay negocios registrados en el piloto. Envía la landing page.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </div>
   );
