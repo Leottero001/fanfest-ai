@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { supabase } from "../lib/supabaseClient";
 import type { Business, SportsEvent, Campaign, AiGeneration } from "../lib/database.types";
-
+import type { Business, SportsEvent, Campaign, AiGeneration, CampaignUpdate } from "../lib/database.types";
 
 // ── Edge Function URL helper ──────────────────────────────────────────────────
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -313,7 +313,7 @@ export default function Home() {
 
       if (data.campaign_id && (!activeCampaign || activeCampaign.id !== data.campaign_id)) {
         const { data: newCamp } = await supabase
-          .from("campaigns")
+          .from("campaigns" as any)
           .select("*")
           .eq("id", data.campaign_id)
           .single();
@@ -336,11 +336,11 @@ export default function Home() {
       const loadingId = addToast("loading", "📲 Preparando copy para WhatsApp...");
       try {
         const { error } = await supabase
-          .from("campaigns")
+          .from("campaigns" as any)
           .update({
             status: "approved",
             approved_at: new Date().toISOString(),
-          } as Partial<Campaign>)
+          })
           .eq("id", activeCampaign.id);
 
         if (error) throw error;
