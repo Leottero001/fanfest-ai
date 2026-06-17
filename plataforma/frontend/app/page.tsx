@@ -96,7 +96,7 @@ export default function LandingPage() {
         preferred_hashtags: formData.preferred_hashtags.split(',').map(s => s.trim()).filter(Boolean)
       };
 
-      const { error } = await supabase.from('beta_businesses').insert([
+      const { error } = await (supabase as any).from('beta_businesses').insert([
         submissionData,
       ]);
 
