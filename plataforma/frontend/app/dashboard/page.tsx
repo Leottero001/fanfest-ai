@@ -238,7 +238,7 @@ export default function Home() {
             home_score: nextScore,
             match_minute: nextMinute,
             status: "live",
-          } as Partial<SportsEvent>)
+          } as any)
           .eq("id", activeEvent.id);
 
         if (error) throw error;
