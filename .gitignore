@@ -5,6 +5,6 @@ node_modules/
 .env.local
 .env.production
 
-docs/privado/
+docs/
 
 *.log
