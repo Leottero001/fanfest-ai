@@ -24,7 +24,7 @@ COMMENT ON COLUMN public.beta_businesses.usual_promos IS 'e.g., 2x1, Happy Hour'
 -- ============================================================================
 -- Recreating the view to include communication_tone
 
-CREATE OR REPLACE VIEW public.v_pilot_crm_dashboard AS
+CREATE OR REPLACE VIEW public.v_pilot_crm_dashboard WITH (security_invoker = on) AS
 SELECT
   bb.id                   AS business_id,
   bb.business_name,

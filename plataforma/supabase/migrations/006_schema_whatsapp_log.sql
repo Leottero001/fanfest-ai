@@ -78,7 +78,7 @@ CREATE POLICY wa_log_select_auth ON public.whatsapp_messages_log
 -- View: CRM Dashboard de Comunicaciones
 -- ============================================================================
 -- Vista útil para monitorear el estado del piloto sin hacer JOINs manuales
-CREATE OR REPLACE VIEW public.v_pilot_crm_dashboard AS
+CREATE OR REPLACE VIEW public.v_pilot_crm_dashboard WITH (security_invoker = on) AS
 SELECT
   bb.id                   AS business_id,
   bb.business_name,
